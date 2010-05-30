@@ -136,6 +136,20 @@ public:
         return true;
     }
 
+    void setInsn(const Arch::InsnInfo* insn)
+    {
+        m_flags &= ~(IS_INSN | IS_PREFIX);
+        m_flags |= DID_INSN_LOOKUP | IS_INSN;
+        m_info = const_cast<Arch::InsnInfo*>(insn);
+    }
+
+    void setRegister(const Register* reg)
+    {
+        m_flags &= ~(IS_REGISTER | IS_REGGROUP | IS_SEGREG | IS_TARGETMOD);
+        m_flags |= DID_REG_LOOKUP | IS_REGISTER;
+        m_info = const_cast<Register*>(reg);
+    }
+
     const Arch::InsnInfo* getInsn()
     {
         assert((m_flags & DID_INSN_LOOKUP) != 0 &&
