@@ -84,6 +84,9 @@ public:
         IMM         ///< An immediate or jump target.
     };
 
+    /// Create an empty instruction operand.
+    Operand();
+
     /// Create an instruction operand from a register.
     /// @param reg  register
     Operand(const Register* reg);

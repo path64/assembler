@@ -42,6 +42,17 @@ TargetModifier::~TargetModifier()
 {
 }
 
+Operand::Operand()
+    : m_reg(0),
+      m_seg(0),
+      m_targetmod(0),
+      m_size(0),
+      m_deref(0),
+      m_strict(0),
+      m_type(NONE)
+{
+}
+
 Operand::Operand(const Register* reg)
     : m_reg(reg),
       m_seg(0),
