@@ -297,6 +297,9 @@ public:
         m_operands.push_back(op);
     }
 
+    const Operands& getOperands() const { return m_operands; }
+    Operands& getOperands() { return m_operands; }
+
     /// Associate a prefix with an instruction.
     /// @param prefix       data that identifies the prefix
     void AddPrefix(const Prefix* prefix, SourceLocation source)
