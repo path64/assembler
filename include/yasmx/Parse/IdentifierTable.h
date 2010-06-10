@@ -71,7 +71,9 @@ class YASM_LIB_EXPORT IdentifierInfo
     };
 
     SymbolRef m_sym;    // Symbol reference (may be 0 if not a symbol).
-    void* m_info;       // Pointer to appropriate data based on flags.
+    void* m_insn;       // Pointer to instruction/prefix data.
+    void* m_reg;        // Pointer to register data.
+    void* m_custom;     // Pointer to custom data.
 
     llvm::StringMapEntry<IdentifierInfo*>* m_entry;
 
@@ -84,7 +86,13 @@ class YASM_LIB_EXPORT IdentifierInfo
     friend class IdentifierTable;
 
 public:
-    IdentifierInfo() : m_info(0), m_token_id(Token::unknown), m_flags(0) {}
+    IdentifierInfo()
+        : m_insn(0)
+        , m_reg(0)
+        , m_custom(0)
+        , m_token_id(Token::unknown)
+        , m_flags(0)
+    {}
 
     /// Return true if this is the identifier for the specified string.
     /// This is intended to be used for string literals only: ii->is_str("foo").
@@ -140,14 +148,14 @@ public:
     {
         m_flags &= ~(IS_INSN | IS_PREFIX);
         m_flags |= DID_INSN_LOOKUP | IS_INSN;
-        m_info = const_cast<Arch::InsnInfo*>(insn);
+        m_insn = const_cast<Arch::InsnInfo*>(insn);
     }
 
     void setRegister(const Register* reg)
     {
         m_flags &= ~(IS_REGISTER | IS_REGGROUP | IS_SEGREG | IS_TARGETMOD);
         m_flags |= DID_REG_LOOKUP | IS_REGISTER;
-        m_info = const_cast<Register*>(reg);
+        m_reg = const_cast<Register*>(reg);
     }
 
     const Arch::InsnInfo* getInsn()
@@ -156,7 +164,7 @@ public:
                "instruction lookup not done");
         if (!(m_flags & IS_INSN))
             return 0;
-        return static_cast<const Arch::InsnInfo*>(m_info);
+        return static_cast<const Arch::InsnInfo*>(m_insn);
     }
 
     const Prefix* getPrefix()
@@ -165,7 +173,7 @@ public:
                "instruction lookup not done");
         if (!(m_flags & IS_PREFIX))
             return 0;
-        return static_cast<const Prefix*>(m_info);
+        return static_cast<const Prefix*>(m_insn);
     }
 
     const Register* getRegister()
@@ -173,7 +181,7 @@ public:
         assert((m_flags & DID_REG_LOOKUP) != 0 && "register lookup not done");
         if (!(m_flags & IS_REGISTER))
             return 0;
-        return static_cast<const Register*>(m_info);
+        return static_cast<const Register*>(m_reg);
     }
 
     const RegisterGroup* getRegGroup()
@@ -181,7 +189,7 @@ public:
         assert((m_flags & DID_REG_LOOKUP) != 0 && "register lookup not done");
         if (!(m_flags & IS_REGGROUP))
             return 0;
-        return static_cast<const RegisterGroup*>(m_info);
+        return static_cast<const RegisterGroup*>(m_reg);
     }
 
     const SegmentRegister* getSegReg()
@@ -189,7 +197,7 @@ public:
         assert((m_flags & DID_REG_LOOKUP) != 0 && "register lookup not done");
         if (!(m_flags & IS_SEGREG))
             return 0;
-        return static_cast<const SegmentRegister*>(m_info);
+        return static_cast<const SegmentRegister*>(m_reg);
     }
 
     const TargetModifier* getTargetModifier()
@@ -197,7 +205,7 @@ public:
         assert((m_flags & DID_REG_LOOKUP) != 0 && "register lookup not done");
         if (!(m_flags & IS_TARGETMOD))
             return 0;
-        return static_cast<const TargetModifier*>(m_info);
+        return static_cast<const TargetModifier*>(m_reg);
     }
 
     // symbol interface
@@ -211,13 +219,13 @@ public:
     {
         if (!(m_flags & IS_CUSTOM))
             return 0;
-        return static_cast<T*>(m_info);
+        return static_cast<T*>(m_custom);
     }
     template<typename T>
     void setCustom(T* d)
     {
         m_flags = IS_CUSTOM | DID_INSN_LOOKUP | DID_REG_LOOKUP;
-        m_info = const_cast<void*>(reinterpret_cast<const void*>(d));
+        m_custom = const_cast<void*>(reinterpret_cast<const void*>(d));
     }
 };
 

@@ -59,12 +59,12 @@ IdentifierInfo::DoInsnLookup(const Arch& arch,
     {
         case Arch::InsnPrefix::INSN:
             ++num_insn_lookup_insn;
-            m_info = const_cast<Arch::InsnInfo*>(ip.getInsn());
+            m_insn = const_cast<Arch::InsnInfo*>(ip.getInsn());
             m_flags |= IS_INSN;
             break;
         case Arch::InsnPrefix::PREFIX:
             ++num_insn_lookup_prefix;
-            m_info = const_cast<Prefix*>(ip.getPrefix());
+            m_insn = const_cast<Prefix*>(ip.getPrefix());
             m_flags |= IS_PREFIX;
             break;
         default:
@@ -88,22 +88,22 @@ IdentifierInfo::DoRegLookup(const Arch& arch,
     {
         case Arch::RegTmod::REG:
             ++num_reg_lookup_reg;
-            m_info = const_cast<Register*>(regtmod.getReg());
+            m_reg = const_cast<Register*>(regtmod.getReg());
             m_flags |= IS_REGISTER;
             break;
         case Arch::RegTmod::REGGROUP:
             ++num_reg_lookup_reggroup;
-            m_info = const_cast<RegisterGroup*>(regtmod.getRegGroup());
+            m_reg = const_cast<RegisterGroup*>(regtmod.getRegGroup());
             m_flags |= IS_REGGROUP;
             break;
         case Arch::RegTmod::SEGREG:
             ++num_reg_lookup_segreg;
-            m_info = const_cast<SegmentRegister*>(regtmod.getSegReg());
+            m_reg = const_cast<SegmentRegister*>(regtmod.getSegReg());
             m_flags |= IS_SEGREG;
             break;
         case Arch::RegTmod::TARGETMOD:
             ++num_reg_lookup_targetmod;
-            m_info = const_cast<TargetModifier*>(regtmod.getTargetMod());
+            m_reg = const_cast<TargetModifier*>(regtmod.getTargetMod());
             m_flags |= IS_TARGETMOD;
             break;
         default:
