@@ -112,7 +112,13 @@ NameValue::swap(NameValue& oth)
     m_name.swap(oth.m_name);
     std::swap(m_type, oth.m_type);
     m_idstr.swap(oth.m_idstr);
-    std::swap(m_expr, oth.m_expr);
+
+    // gcc-3.x has incorrect std::swap implementation for std::auto_ptr
+    std::auto_ptr<Expr> tmp = m_expr;
+    m_expr = oth.m_expr;
+    oth.m_expr = tmp;
+    assert(tmp.get() == NULL);
+
     std::swap(m_id_prefix, oth.m_id_prefix);
     std::swap(m_name_source, oth.m_name_source);
     std::swap(m_equals_source, oth.m_equals_source);

@@ -1074,7 +1074,7 @@ Infix(llvm::raw_ostream& os, const Expr& e, int base, int pos=-1)
     for (CVector::const_reverse_iterator i=children.rbegin(),
          end=children.rend(); i != end; ++i)
     {
-        if (i != children.rbegin())
+        if (i != CVector::const_reverse_iterator(children.rbegin()))
         {
             os << opstr;
             // Force RHS of shift operations to decimal
