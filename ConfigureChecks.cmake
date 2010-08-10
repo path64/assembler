@@ -577,14 +577,7 @@ CONFIGURE_FILE(config.h.cmake ${CMAKE_CURRENT_BINARY_DIR}/config.h)
 
 INCLUDE(YasmCXXTR1)
 IF(BOOST_REQUIRED)
-  FIND_PACKAGE(Boost)
-  IF(Boost_FOUND)
-    INCLUDE_DIRECTORIES(${Boost_INCLUDE_DIRS})
-  ELSE(Boost_FOUND)
-    MESSAGE(FATAL_ERROR "Couldn't find the Boost libraries and/or include directory to fulfill TR1 requirements.  Please install Boost or a TR1 development package. You can set BOOST_ROOT, BOOST_INCLUDEDIR and BOOST_LIBRARYDIR to help find Boost.")
-  ENDIF(Boost_FOUND)
-ELSE(BOOST_REQUIRED)
-  INCLUDE_DIRECTORIES(${yasm_SOURCE_DIR}/lwboost)
+    INCLUDE_DIRECTORIES(${CMAKE_CURRENT_SOURCE_DIR}/boost)
 ENDIF(BOOST_REQUIRED)
 
 CONFIGURE_FILE(
