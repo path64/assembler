@@ -5,13 +5,13 @@ if (COMMAND cmake_policy)
 endif (COMMAND cmake_policy)
 
 # Where to look first for cmake modules
-set(YASM_MODULE_DIR "${CMAKE_SOURCE_DIR}/cmake/modules")
+set(YASM_MODULE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/cmake/modules")
 set(CMAKE_MODULE_PATH "${YASM_MODULE_DIR}")
 
-set(LIBRARY_OUTPUT_PATH "${CMAKE_BINARY_DIR}/lib")
+set(LIBRARY_OUTPUT_PATH "${CMAKE_CURRENT_BINARY_DIR}/lib")
 if (WIN32)
    # we don't want to be forced to set two paths into the build tree 
-   set(LIBRARY_OUTPUT_PATH ${CMAKE_BINARY_DIR})
+   set(LIBRARY_OUTPUT_PATH ${CMAKE_CURRENT_BINARY_DIR})
 endif (WIN32)
 
 OPTION(BUILD_STATIC "Build a monolithic executable with no plugin support" OFF)
@@ -72,10 +72,10 @@ set (PACKAGE_NAME "yasm")
 set (PACKAGE_STRING "yasm ${PACKAGE_VERSION}")
 
 INCLUDE_DIRECTORIES(BEFORE
-    ${CMAKE_BINARY_DIR}
+    ${CMAKE_CURRENT_BINARY_DIR}
     ${yasm_SOURCE_DIR}
     ${yasm_SOURCE_DIR}/include
-    ${CMAKE_BINARY_DIR}/include
+    ${CMAKE_CURRENT_BINARY_DIR}/include
     )
 
 INCLUDE(CTest)
@@ -84,8 +84,8 @@ INCLUDE(CTest)
 set (CPACK_PACKAGE_DESCRIPTION_SUMMARY "Yasm is a modular assembler")
 set (CPACK_PACKAGE_NAME "yasm")
 set (CPACK_PACKAGE_VENDOR "Tortall Networks")
-set (CPACK_PACKAGE_DESCRIPTION_FILE "${CMAKE_SOURCE_DIR}/pkg-descr")
-set (CPACK_RESOURCE_FILE_LICENSE "${CMAKE_SOURCE_DIR}/Copying/COPYING")
+set (CPACK_PACKAGE_DESCRIPTION_FILE "${CMAKE_CURRENT_SOURCE_DIR}/pkg-descr")
+set (CPACK_RESOURCE_FILE_LICENSE "${CMAKE_CURRENT_SOURCE_DIR}/Copying/COPYING")
 set (CPACK_PACKAGE_VERSION_MAJOR "${YASM_VERSION_MAJOR}")
 set (CPACK_PACKAGE_VERSION_MINOR "${YASM_VERSION_MINOR}")
 set (CPACK_PACKAGE_VERSION_PATCH "${YASM_VERSION_SUBMINOR}")
@@ -106,26 +106,26 @@ INCLUDE(CPack)
 INCLUDE(ConfigureChecks.cmake)
 
 # Generate diagnostic includes
-FILE(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/lib/yasmx/Basic)
-FILE(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/include/yasmx/Basic)
+FILE(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/lib/yasmx/Basic)
+FILE(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/include/yasmx/Basic)
 ADD_CUSTOM_COMMAND(
     OUTPUT
-        ${CMAKE_BINARY_DIR}/lib/yasmx/Basic/DiagnosticGroups.cpp
-        ${CMAKE_BINARY_DIR}/lib/yasmx/Basic/DiagnosticCategories.cpp
-        ${CMAKE_BINARY_DIR}/include/yasmx/Basic/DiagnosticKinds.h
-        ${CMAKE_BINARY_DIR}/lib/yasmx/Basic/StaticDiagInfo.inc
-    COMMAND ${PYTHON_EXECUTABLE} ${CMAKE_SOURCE_DIR}/include/yasmx/Basic/gen_diag.py
-        ${CMAKE_BINARY_DIR}/lib/yasmx/Basic/DiagnosticGroups.cpp
-        ${CMAKE_BINARY_DIR}/lib/yasmx/Basic/DiagnosticCategories.cpp
-        ${CMAKE_BINARY_DIR}/include/yasmx/Basic/DiagnosticKinds.h
-        ${CMAKE_BINARY_DIR}/lib/yasmx/Basic/StaticDiagInfo.inc
-    MAIN_DEPENDENCY ${CMAKE_SOURCE_DIR}/include/yasmx/Basic/gen_diag.py
+        ${CMAKE_CURRENT_BINARY_DIR}/lib/yasmx/Basic/DiagnosticGroups.cpp
+        ${CMAKE_CURRENT_BINARY_DIR}/lib/yasmx/Basic/DiagnosticCategories.cpp
+        ${CMAKE_CURRENT_BINARY_DIR}/include/yasmx/Basic/DiagnosticKinds.h
+        ${CMAKE_CURRENT_BINARY_DIR}/lib/yasmx/Basic/StaticDiagInfo.inc
+    COMMAND ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/include/yasmx/Basic/gen_diag.py
+        ${CMAKE_CURRENT_BINARY_DIR}/lib/yasmx/Basic/DiagnosticGroups.cpp
+        ${CMAKE_CURRENT_BINARY_DIR}/lib/yasmx/Basic/DiagnosticCategories.cpp
+        ${CMAKE_CURRENT_BINARY_DIR}/include/yasmx/Basic/DiagnosticKinds.h
+        ${CMAKE_CURRENT_BINARY_DIR}/lib/yasmx/Basic/StaticDiagInfo.inc
+    MAIN_DEPENDENCY ${CMAKE_CURRENT_SOURCE_DIR}/include/yasmx/Basic/gen_diag.py
     )
 ADD_CUSTOM_TARGET(DiagnosticIncludes
-    DEPENDS ${CMAKE_BINARY_DIR}/lib/yasmx/Basic/DiagnosticGroups.cpp
-    DEPENDS ${CMAKE_BINARY_DIR}/lib/yasmx/Basic/DiagnosticCategories.cpp
-    DEPENDS ${CMAKE_BINARY_DIR}/include/yasmx/Basic/DiagnosticKinds.h
-    DEPENDS ${CMAKE_BINARY_DIR}/lib/yasmx/Basic/StaticDiagInfo.inc)
+    DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/lib/yasmx/Basic/DiagnosticGroups.cpp
+    DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/lib/yasmx/Basic/DiagnosticCategories.cpp
+    DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/include/yasmx/Basic/DiagnosticKinds.h
+    DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/lib/yasmx/Basic/StaticDiagInfo.inc)
 
 ADD_SUBDIRECTORY(tools)
 ADD_SUBDIRECTORY(modules)

@@ -36,6 +36,7 @@
 #include "yasmx/Basic/Diagnostic.h"
 #include "yasmx/Parse/Preprocessor.h"
 
+#include <cctype>
 
 using namespace yasm;
 

@@ -231,6 +231,13 @@ macro (YASM_ADD_LIBRARY _target_NAME _lib_TYPE)
    set(_symbol "MAKE_${_symbol}_LIB")
    set_target_properties(${_target_NAME} PROPERTIES DEFINE_SYMBOL ${_symbol})
 
+   # adding -fPIC flag for shared libraries
+   if(SUPPORTS_FPIC_FLAG)
+      if("X${_add_lib_param}" STREQUAL "XSHARED")
+         set_target_properties(${_target_NAME} PROPERTIES COMPILE_FLAGS "-fPIC")
+      endif()
+   endif()
+
 endmacro (YASM_ADD_LIBRARY _target_NAME _lib_TYPE)
 
 macro (YASM_ADD_MODULE _module_NAME)

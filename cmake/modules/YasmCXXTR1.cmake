@@ -11,11 +11,11 @@ MACRO(YASM_CHECK_CXX TEST_CODE SYMBOL HEADER VARIABLE)
     SET(CMAKE_CONFIGURABLE_FILE_CONTENT
         "#include <algorithm>\n#include <vector>\n#include <${HEADER}>\n\nstruct X {\n  void f() {}\n};\n\nvoid f2(int y) {}\n\nint main() {\n  ${TEST_CODE};\n  return 0;\n}\n")
     CONFIGURE_FILE("${CMAKE_ROOT}/Modules/CMakeConfigurableFile.in"
-        "${CMAKE_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/CMakeTmp/CheckTR1.cpp" @ONLY)
+        "${CMAKE_CURRENT_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/CMakeTmp/CheckTR1.cpp" @ONLY)
     MESSAGE(STATUS "Looking for ${SYMBOL} in ${HEADER}")
     TRY_COMPILE(${VARIABLE}
-        ${CMAKE_BINARY_DIR}
-        ${CMAKE_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/CMakeTmp/CheckTR1.cpp
+        ${CMAKE_CURRENT_BINARY_DIR}
+        ${CMAKE_CURRENT_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/CMakeTmp/CheckTR1.cpp
         COMPILE_DEFINITIONS ${CMAKE_REQUIRED_DEFINITIONS}
         CMAKE_FLAGS
         "-DCOMPILE_DEFINITIONS:STRING=${CMAKE_REQUIRED_FLAGS}"
@@ -27,18 +27,18 @@ MACRO(YASM_CHECK_CXX TEST_CODE SYMBOL HEADER VARIABLE)
     IF(${VARIABLE})
       MESSAGE(STATUS "Looking for ${SYMBOL} in ${HEADER} - found")
       SET(${VARIABLE} 1 CACHE INTERNAL "Have symbol ${SYMBOL} in ${HEADER}")
-      FILE(APPEND ${CMAKE_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/CMakeOutput.log 
+      FILE(APPEND ${CMAKE_CURRENT_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/CMakeOutput.log 
         "Determining if the ${SYMBOL} "
         "exist passed with the following output:\n"
-        "${OUTPUT}\nFile ${CMAKE_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/CMakeTmp/CheckTR1.cpp:\n"
+        "${OUTPUT}\nFile ${CMAKE_CURRENT_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/CMakeTmp/CheckTR1.cpp:\n"
         "${CMAKE_CONFIGURABLE_FILE_CONTENT}\n")
     ELSE(${VARIABLE})
       MESSAGE(STATUS "Looking for ${SYMBOL} in ${HEADER} - not found.")
       SET(${VARIABLE} "" CACHE INTERNAL "Have symbol ${SYMBOL} in ${HEADER}")
-      FILE(APPEND ${CMAKE_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/CMakeError.log 
+      FILE(APPEND ${CMAKE_CURRENT_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/CMakeError.log 
         "Determining if the ${SYMBOL} "
         "exist failed with the following output:\n"
-        "${OUTPUT}\nFile ${CMAKE_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/CMakeTmp/CheckTR1.cpp:\n"
+        "${OUTPUT}\nFile ${CMAKE_CURRENT_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/CMakeTmp/CheckTR1.cpp:\n"
         "${CMAKE_CONFIGURABLE_FILE_CONTENT}\n")
     ENDIF(${VARIABLE})
   ENDIF("${VARIABLE}" MATCHES "^${VARIABLE}")
