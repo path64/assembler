@@ -590,7 +590,8 @@ add_warning("warn_nobits_data",
             group="init-nobits")
 add_warning("warn_uninit_zero",
             "uninitialized space declared in code/data section: zeroing",
-            group="uninit-contents")
+            group="uninit-contents",
+            mapping="IGNORE")
 add_warning("warn_export_equ",
             "object format does not support exporting EQU/absolute values")
 add_warning("warn_name_too_long", "name too long, truncating to %0 bytes")
