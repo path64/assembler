@@ -34,6 +34,8 @@ endif (WITH_XML)
 
 OPTION(BUILD_TEST_COVERAGE "Enable test coverage if possible" ON)
 
+OPTION(INSTALL_GPUASM "Install gpuasm in make install target" ON)
+
 IF(BUILD_TESTS)
     SET(GTEST_ROOT $ENV{GTEST_ROOT} CACHE PATH "GoogleMock root directory")
     FIND_PACKAGE(GTest)
@@ -133,5 +135,5 @@ ADD_SUBDIRECTORY(lib)
 ADD_SUBDIRECTORY(frontends)
 IF(BUILD_TESTS)
     ADD_SUBDIRECTORY(unittests)
+    ADD_SUBDIRECTORY(regression)
 ENDIF(BUILD_TESTS)
-ADD_SUBDIRECTORY(regression)
