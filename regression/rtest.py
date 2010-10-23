@@ -24,6 +24,7 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 #
+import binascii
 import os
 import subprocess
 import sys
@@ -128,7 +129,13 @@ class Test(object):
                 if not comment.startswith('out:'):
                     continue
                 golden.extend(comment[4:].split())
-        golden = [int(x, 16) for x in golden if x]
+        ngolden = []
+        for x in golden:
+            if not x:
+                continue
+            # Currently only does little endian
+            ngolden.extend(ord(y) for y in reversed(binascii.a2b_hex(x)))
+        golden = ngolden
 
         goldenfn = self.basefn + ".gold"
 
