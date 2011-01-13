@@ -45,14 +45,11 @@
 /* Define to the address where bug reports for this package should be sent. */
 #define PACKAGE_BUGREPORT "bug-yasm@tortall.net"
 
-/* Define to internal version of this package. */
-#define PACKAGE_INTVER "@PACKAGE_INTVER@"
-
 /* Define to build version of this package. */
 #define PACKAGE_BUILD "@PACKAGE_BUILD@"
 
 /* Define to the full name of this package. */
-#define PACKAGE_NAME "yasm"
+#define PACKAGE_NAME "@PACKAGE_NAME@"
 
 /* Define to the full name and version of this package. */
 #define PACKAGE_STRING "@PACKAGE_STRING@"

@@ -58,15 +58,16 @@
 namespace cl = llvm::cl;
 
 // version message
-static const char* full_version = "yobjdump " PACKAGE_INTVER "." PACKAGE_BUILD;
+static const char* full_version = "yobjdump " PACKAGE_VERSION;
 void
 PrintVersion()
 {
     llvm::outs()
         << full_version << '\n'
         << "Compiled on " __DATE__ ".\n"
-        << "Copyright (c) 2001-2009 Peter Johnson and other Yasm developers.\n"
-        << "Run yobjdump --license for licensing overview and summary.\n";
+        << "Copyright (c) 2009-2010 PathScale Inc. and others. All Rights Reserved.\n"
+        << "You can find complete copyright, patent and legal notices in the "
+        << "corresponding documentation.\n";
 }
 
 // extra help messages

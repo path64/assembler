@@ -1,4 +1,4 @@
-Yasm is Copyright (c) 2001-2008 Peter Johnson and other Yasm developers.
+Yasm is Copyright (c) 2001-2011 Peter Johnson and other Yasm developers.
 
 Yasm developers and/or contributors include:
   Peter Johnson
@@ -35,8 +35,6 @@ which is equivalent to the 3-clause BSD license.
 This means that libyasm is free for binary-only distribution as long as the
 terms of the 3-clause BSD license are fulfilled.
 
-Libyasm is also GPL and LGPL compatible.
-
 -------
 Modules
 -------
@@ -51,9 +49,7 @@ The frontends are 2-clause BSD licensed.
 License Texts
 -------------
 The full text of all licenses are provided in separate files in the source
-distribution.  Each source file may include the entire license (in the case
-of the BSD and Artistic licenses), or may reference the GPL or LGPL license
-file.
+distribution.
 
 BSD.txt - 2-clause and 3-clause BSD licenses
 LLVM.txt - University of Illinois/NCSA Open Source License (3-clause BSD-like)
