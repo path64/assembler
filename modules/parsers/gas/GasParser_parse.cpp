@@ -210,6 +210,11 @@ next:
             ParseNasmLineMarker();
             break;
 #endif
+        case GasToken::dollar:
+            if (m_arch->hasParseInsn())
+                return m_arch->ParseInsn(*m_container, *this);
+            Diag(m_token, diag::err_expected_insn_or_label_after_eol);
+            return false;
         default:
             Diag(m_token, diag::err_expected_insn_or_label_after_eol);
             return false;
