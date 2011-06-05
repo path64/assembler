@@ -61,8 +61,15 @@ llvm::sys::Memory::AllocateRWX(size_t NumBytes, const MemoryBlock* NearBlock,
   void *pa = ::mmap(start, pageSize*NumPages, PROT_READ|PROT_EXEC,
                     flags, fd, 0);
 #else
+#ifdef __sun
+  void *pa = reinterpret_cast<void*>(
+                    ::mmap(reinterpret_cast<char*>(start), pageSize*NumPages,
+                           PROT_READ|PROT_WRITE|PROT_EXEC,
+                           flags, fd, 0));
+#else // !__sun
   void *pa = ::mmap(start, pageSize*NumPages, PROT_READ|PROT_WRITE|PROT_EXEC,
                     flags, fd, 0);
+#endif // !__sun
 #endif
   if (pa == MAP_FAILED) {
     if (NearBlock) //Try again without a near hint
@@ -99,7 +106,11 @@ llvm::sys::Memory::AllocateRWX(size_t NumBytes, const MemoryBlock* NearBlock,
 
 bool llvm::sys::Memory::ReleaseRWX(MemoryBlock &M, std::string *ErrMsg) {
   if (M.Address == 0 || M.Size == 0) return false;
+#ifdef __sun
+  if (0 != ::munmap(reinterpret_cast<char*>(M.Address), M.Size))
+#else // !__sun
   if (0 != ::munmap(M.Address, M.Size))
+#endif // !__sun
     return MakeErrMsg(ErrMsg, "Can't release RWX Memory");
   return false;
 }

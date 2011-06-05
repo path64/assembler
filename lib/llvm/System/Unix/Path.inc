@@ -917,7 +917,7 @@ const char *Path::MapInFilePages(int FD, uint64_t FileSize) {
 }
 
 void Path::UnMapFilePages(const char *BasePtr, uint64_t FileSize) {
-  ::munmap((void*)BasePtr, FileSize);
+  ::munmap((char*)BasePtr, FileSize);
 }
 
 } // end llvm namespace
