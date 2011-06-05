@@ -28,6 +28,8 @@ std::string TimeValue::str() const {
 #ifdef __hpux
 // note that the following line needs -D_REENTRANT on HP-UX to be picked up 
   asctime_r(localtime(&ourTime), buffer);
+#elif defined(__sun) && defined(__PATHCC__)
+  ::asctime_r(::localtime(&ourTime), buffer, sizeof(buffer));
 #else
   ::asctime_r(::localtime(&ourTime), buffer);
 #endif
