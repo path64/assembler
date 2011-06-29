@@ -1410,9 +1410,18 @@ ElfObject::AppendSection(llvm::StringRef name,
         type = SHT_PROGBITS;
         flags = SHF_ALLOC + SHF_WRITE + SHF_TLS;
     }
-    else if (name == ".rodata" || name == ".eh_frame")
+    else if (name == ".rodata")
     {
         type = SHT_PROGBITS;
+        flags = SHF_ALLOC;
+    }
+    else if (name == ".eh_frame")
+    {
+#ifdef __sun
+        type = SHT_UNWIND;
+#else
+        type = SHT_PROGBITS;
+#endif
         flags = SHF_ALLOC;
     }
     else if (name == ".text")
