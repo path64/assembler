@@ -26,7 +26,7 @@ INCLUDE(InstallOptions.cmake)
 INCLUDE(YasmMacros)
 
 OPTION(ENABLE_NLS "Enable message translations" OFF)
-OPTION(WITH_XML "Enable XML debug dumps" ON)
+OPTION(WITH_XML "Enable XML debug dumps" OFF)
 if (WITH_XML)
     ADD_DEFINITIONS(-DWITH_XML)
 endif (WITH_XML)
