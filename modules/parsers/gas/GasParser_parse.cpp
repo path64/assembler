@@ -742,7 +742,7 @@ GasParser::ParseDirAscii(unsigned int withzero, SourceLocation source)
                 AppendData(*m_container, str.getString(strbuf), withzero);
             ConsumeToken();
         }
-        else if (m_token.is(GasToken::eol))
+        else if (m_token.isEndOfStatement())
             break;
         else
         {
@@ -760,7 +760,7 @@ GasParser::ParseDirAscii(unsigned int withzero, SourceLocation source)
 bool
 GasParser::ParseDirFloat(unsigned int size, SourceLocation source)
 {
-    if (m_token.is(GasToken::eol))
+    if (m_token.isEndOfStatement())
         return true;
 
     SourceLocation lastcomma = m_token.getLocation().getFileLocWithOffset(-1);
@@ -792,6 +792,7 @@ GasParser::ParseDirFloat(unsigned int size, SourceLocation source)
                 return false;
             }
             case GasToken::eol:
+            case GasToken::semi:
             case GasToken::comma:
                 Diag(lastcomma.getFileLocWithOffset(1),
                      diag::warn_zero_assumed_for_missing_expression);
@@ -829,7 +830,7 @@ GasParser::ParseDirFloat(unsigned int size, SourceLocation source)
 bool
 GasParser::ParseDirData(unsigned int size, SourceLocation source)
 {
-    if (m_token.is(GasToken::eol))
+    if (m_token.isEndOfStatement())
         return true;
 
     SourceLocation lastcomma = m_token.getLocation().getFileLocWithOffset(-1);
@@ -856,7 +857,7 @@ GasParser::ParseDirData(unsigned int size, SourceLocation source)
 bool
 GasParser::ParseDirLeb128(unsigned int sign, SourceLocation source)
 {
-    if (m_token.is(GasToken::eol))
+    if (m_token.isEndOfStatement())
         return true;
 
     SourceLocation lastcomma = m_token.getLocation().getFileLocWithOffset(-1);
@@ -1882,6 +1883,12 @@ GasParser::ParseRegOperand()
                     Diag(segreg_source,
                          diag::warn_multiple_seg_override);
                 ea->m_segreg = segreg;
+            }
+
+            if (m_token.isNot(GasToken::comma) && !m_token.isEndOfStatement())
+            {
+                Diag(m_token.getLocation(), diag::err_bad_memory_operand);
+                SkipUntil(GasToken::comma, true, true);
             }
             return op;
         }

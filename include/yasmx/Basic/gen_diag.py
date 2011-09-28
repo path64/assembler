@@ -253,6 +253,10 @@ add_error("err_unrecognized_directive", "unrecognized directive")
 add_warning("warn_unrecognized_directive", "unrecognized directive")
 add_warning("warn_unrecognized_ident", "unrecognized identifier")
 
+# NASM errors
+add_error("err_non_reserve_in_absolute_section",
+          "only RES* allowed within absolute section")
+
 # GAS warnings
 add_warning("warn_scale_without_index",
             "scale factor without an index register")
@@ -272,6 +276,7 @@ add_warning("warn_previous_without_section",
             ".previous without corresponding .section; ignored")
 add_warning("warn_zero_assumed_for_missing_expression",
             "zero assumed for missing expression")
+add_error("err_bad_memory_operand", "bad memory operand")
 
 # Value
 add_error("err_too_complex_expression", "expression too complex")
@@ -585,6 +590,9 @@ add_error("err_pp_elseif_without_if", "elseif without if")
 add_error("err_pp_endif_without_if", "endif without if")
 add_error("err_pp_if_without_endif", "if without endif")
 add_error("err_pp_cond_not_constant", "non-constant conditional expression")
+
+add_error("err_pp_expected_line", "expected %%line")
+add_fatal("fatal_pp_errors", "preprocessor errors")
 
 # Output
 add_warning("warn_nobits_data",

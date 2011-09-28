@@ -376,41 +376,8 @@ NasmParser::DoParse()
             ParseLine();
             SkipUntil(NasmToken::eol);
         }
-#if 0
-            if (m_abspos.get() != 0)
-            {
-                // If we're inside an absolute section, just add to the
-                // absolute position rather than appending bytecodes to a
-                // section.  Only RES* are allowed in an absolute section,
-                // so this is easy.
-                if (m_bc->has_contents())
-                {
-                    unsigned int itemsize;
-                    const Expr* numitems = m_bc->reserve_numitems(itemsize);
-                    if (numitems)
-                    {
-                        Expr::Ptr e(new Expr(numitems->clone(),
-                                             Op::MUL,
-                                             new IntNum(itemsize),
-                                             cur_line));
-                        const Expr* multiple = m_bc->getMultipleExpr();
-                        if (multiple)
-                            e.reset(new Expr(e.release(),
-                                             Op::MUL,
-                                             multiple->clone(),
-                                             cur_line));
-                        m_abspos.reset(new Expr(m_abspos.release(),
-                                                Op::ADD,
-                                                e,
-                                                cur_line));
-                    }
-                    else
-                        throw SyntaxError(
-                            N_("only RES* allowed within absolute section"));
-                    bc.reset(new Bytecode());
-                }
-            }
-#endif
+        if (!m_abspos.isEmpty())
+            m_abspos += m_absinc;
     }
 }
 
@@ -428,40 +395,86 @@ NasmParser::ParseLine()
 
     switch (m_token.getKind())
     {
-#if 0
-        case LINE: // LINE INTNUM '+' INTNUM FILENAME
+        case NasmToken::percent: // %line INTNUM '+' INTNUM FILENAME
         {
-            getNextToken();
+            // %line
+            SourceLocation percent_loc = ConsumeToken();
 
-            if (!Expect(INTNUM, diag::err_expected_integer))
+            if (m_token.isNot(NasmToken::identifier))
+            {
+                Diag(m_token, diag::err_expected_directive_name);
                 return false;
-            std::auto_ptr<IntNum> line(INTNUM_val);
-            getNextToken();
+            }
 
-            if (!ExpectAndConsume('+', diag::err_expected_plus))
+            llvm::SmallString<16> dirname_buf;
+            if (!m_preproc.getSpelling(m_token, dirname_buf)
+                .equals_lower("line"))
+            {
+                Diag(m_token, diag::err_pp_expected_line);
                 return false;
+            }
 
-            if (!Expect(INTNUM, diag::err_expected_integer))
-                return false;
-            std::auto_ptr<IntNum> incr(INTNUM_val);
-            getNextToken();
+            ConsumeToken();
 
-            if (!Expect(FILENAME, diag::err_expected_filename))
+            // line number
+            if (m_token.isNot(NasmToken::numeric_constant))
+            {
+                Diag(m_token, diag::err_expected_integer);
                 return false;
-            std::string filename;
-            std::swap(filename, FILENAME_val);
-            getNextToken();
+            }
+
+            IntNum line;
+            NasmNumericParser line_p(m_token.getLiteral(),
+                                     m_token.getLocation(),
+                                     m_preproc);
+            if (line_p.hadError())
+                ;
+            else if (line_p.isInteger())
+                line_p.getIntegerValue(&line);
+            else
+                Diag(m_token, diag::err_expected_integer);
+
+            ConsumeToken();
+
+            // '+'
+            ExpectAndConsume(NasmToken::plus, diag::err_expected_plus);
+
+            // increment
+            if (m_token.isNot(NasmToken::numeric_constant))
+            {
+                Diag(m_token, diag::err_expected_integer);
+                return false;
+            }
+
+            IntNum incr;
+            NasmNumericParser incr_p(m_token.getLiteral(),
+                                     m_token.getLocation(),
+                                     m_preproc);
+            if (incr_p.hadError())
+                ;
+            else if (incr_p.isInteger())
+                incr_p.getIntegerValue(&incr);
+            else
+                Diag(m_token, diag::err_expected_integer);
+
+            ConsumeToken();
+
+            // filename
+            unsigned int toks[1] = {NasmToken::eol};
+            SourceLocation start, end;
+            llvm::SmallString<128> filename_buf;
+            llvm::StringRef filename =
+                MergeTokensUntil(toks, 1, &start, &end, filename_buf);
 
             // %line indicates the line number of the *next* line, so subtract
             // out the increment when setting the line number.
             // FIXME: handle incr
-            SourceManager& smgr = m_preproc->getSourceManager();
-            smgr.AddLineNote(m_source, line->getUInt(),
+            SourceManager& smgr = m_preproc.getSourceManager();
+            smgr.AddLineNote(m_token.getLocation(), line.getUInt(),
                              smgr.getLineTableFilenameID(filename.data(),
                                                          filename.size()));
             break;
         }
-#endif
         case NasmToken::l_square: // [ directive ]
         {
             SourceLocation lsquare_loc = ConsumeBracket();
@@ -483,7 +496,10 @@ NasmParser::ParseLine()
                 return false;
             }
 
-            DirectiveInfo info(*m_object, m_container->getEndLoc(), dirloc);
+            Location loc = {0, 0};
+            if (m_container)
+                loc = m_container->getEndLoc();
+            DirectiveInfo info(*m_object, loc, dirloc);
             // If this is a section or segment directive, parse the section
             // name specially.
             // XXX: should allow any directive to flag this to be done.
@@ -585,6 +601,7 @@ NasmParser::ParseLine()
                     Diag(m_token, diag::warn_orphan_label);
                 break;
             }
+            CheckKeyword(m_token.getIdentifierInfo());
             if (m_token.is(NasmToken::kw_times))
             {
                 return ParseTimes(ConsumeToken());
@@ -714,17 +731,29 @@ NasmParser::ParseTimes(SourceLocation times_source)
             << "TIMES";
         return false;
     }
-    BytecodeContainer* orig_container = m_container;
-    m_container = &AppendMultiple(*m_container, multiple, times_source);
-
     SourceLocation cursource = m_token.getLocation();
-    if (!ParseExp())
+
+    if (!m_abspos.isEmpty())
     {
-        Diag(cursource, diag::err_expected_insn_after_times);
-        m_container = orig_container;
-        return false;
+        if (!ParseExp())
+        {
+            Diag(cursource, diag::err_expected_insn_after_times);
+            return false;
+        }
+        m_absinc *= *multiple;
     }
-    m_container = orig_container;
+    else
+    {
+        BytecodeContainer* orig_container = m_container;
+        m_container = &AppendMultiple(*m_container, multiple, times_source);
+        if (!ParseExp())
+        {
+            Diag(cursource, diag::err_expected_insn_after_times);
+            m_container = orig_container;
+            return false;
+        }
+        m_container = orig_container;
+    }
     return true;
 }
 
@@ -746,6 +775,11 @@ NasmParser::ParseExp()
         Insn::Ptr insn = ParseInsn();
         if (insn.get() != 0)
         {
+            if (!m_abspos.isEmpty())
+            {
+                Diag(exp_source, diag::err_non_reserve_in_absolute_section);
+                return false;
+            }
             insn->Append(*m_container, exp_source, m_preproc.getDiagnostics());
             return true;
         }
@@ -756,6 +790,11 @@ NasmParser::ParseExp()
     {
         case PseudoInsn::DECLARE_DATA:
         {
+            if (!m_abspos.isEmpty())
+            {
+                Diag(m_token, diag::err_non_reserve_in_absolute_section);
+                return false;
+            }
             ConsumeToken();
 
             for (;;)
@@ -812,13 +851,23 @@ dv_done:
                     << "RESx";
                 return false;
             }
-            BytecodeContainer& multc =
-                AppendMultiple(*m_container, e, exp_source);
-            multc.AppendGap(pseudo->size, exp_source);
+            if (!m_abspos.isEmpty())
+                m_absinc = MUL(pseudo->size, *e);
+            else
+            {
+                BytecodeContainer& multc =
+                    AppendMultiple(*m_container, e, exp_source);
+                multc.AppendGap(pseudo->size, exp_source);
+            }
             return true;
         }
         case PseudoInsn::INCBIN:
         {
+            if (!m_abspos.isEmpty())
+            {
+                Diag(m_token, diag::err_non_reserve_in_absolute_section);
+                return false;
+            }
             ConsumeToken();
 
             if (m_token.isNot(NasmToken::string_literal))
