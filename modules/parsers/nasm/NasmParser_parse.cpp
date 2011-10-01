@@ -70,6 +70,7 @@ NasmParser::CheckPseudoInsn(IdentifierInfo* ii)
     /// All possible pseudo-instructions (to avoid dynamic allocation).
     static const PseudoInsn equ_insn = {PseudoInsn::EQU, 0};
     static const PseudoInsn incbin_insn = {PseudoInsn::INCBIN, 0};
+    static const PseudoInsn times_insn = {PseudoInsn::TIMES, 0};
 
     if (!ii->isUnknown())
         return;
@@ -122,6 +123,17 @@ NasmParser::CheckPseudoInsn(IdentifierInfo* ii)
             pseudo = m_reserve_insns;
             name += 3;
             break;
+        case 't':
+        case 'T':
+            // TIMES
+            if (len != 5 ||
+                (name[1] != 'i' && name[1] != 'I') ||
+                (name[2] != 'm' && name[2] != 'M') ||
+                (name[3] != 'e' && name[3] != 'E') ||
+                (name[4] != 's' && name[4] != 'S'))
+                return;
+            ii->setCustom(&times_insn);
+            return;
         default:
             return;
     }
@@ -297,27 +309,17 @@ NasmParser::CheckKeyword(IdentifierInfo* ii)
                 m_token.setKind(NasmToken::kw_strict);
                 return true;
             }
+            return false;
         case 't':
         case 'T':
-            // TIMES or TWORD
-            if (len != 5)
-                return false;
             // TWORD
-            if ((name[1] == 'w' || name[1] == 'W'))
+            if (len == 5 && (name[1] == 'w' || name[1] == 'W'))
             {
                 kind = NasmToken::kw_tword;
                 ++name;
                 break;  // check for "WORD" suffix
             }
-            // TIMES
-            if ((name[1] != 'i' && name[1] != 'I') ||
-                (name[2] != 'm' && name[2] != 'M') ||
-                (name[3] != 'e' && name[3] != 'E') ||
-                (name[4] != 's' && name[4] != 'S'))
-                return false;
-            ii->setTokenKind(NasmToken::kw_times);
-            m_token.setKind(NasmToken::kw_times);
-            return true;
+            return false;
         case 'w':
         case 'W':
             // WRT
@@ -541,8 +543,6 @@ NasmParser::ParseLine()
             DoDirective(dirname, info);
             break;
         }
-        case NasmToken::kw_times: // TIMES expr exp
-            return ParseTimes(ConsumeToken());
         case NasmToken::identifier:
             // check for keyword
             if (CheckKeyword(m_token.getIdentifierInfo()))
@@ -600,11 +600,6 @@ NasmParser::ParseLine()
                 if (!got_colon)
                     Diag(m_token, diag::warn_orphan_label);
                 break;
-            }
-            CheckKeyword(m_token.getIdentifierInfo());
-            if (m_token.is(NasmToken::kw_times))
-            {
-                return ParseTimes(ConsumeToken());
             }
             if (!ParseExp())
             {
@@ -721,43 +716,6 @@ next:
 }
 
 bool
-NasmParser::ParseTimes(SourceLocation times_source)
-{
-    Expr::Ptr multiple(new Expr);
-    NasmParseDataExprTerm parse_data_term;
-    if (!ParseExpr(*multiple, &parse_data_term))
-    {
-        Diag(m_token, diag::err_expected_expression_after_id)
-            << "TIMES";
-        return false;
-    }
-    SourceLocation cursource = m_token.getLocation();
-
-    if (!m_abspos.isEmpty())
-    {
-        if (!ParseExp())
-        {
-            Diag(cursource, diag::err_expected_insn_after_times);
-            return false;
-        }
-        m_absinc *= *multiple;
-    }
-    else
-    {
-        BytecodeContainer* orig_container = m_container;
-        m_container = &AppendMultiple(*m_container, multiple, times_source);
-        if (!ParseExp())
-        {
-            Diag(cursource, diag::err_expected_insn_after_times);
-            m_container = orig_container;
-            return false;
-        }
-        m_container = orig_container;
-    }
-    return true;
-}
-
-bool
 NasmParser::ParseExp()
 {
     if (m_token.isNot(NasmToken::identifier))
@@ -797,6 +755,7 @@ NasmParser::ParseExp()
             }
             ConsumeToken();
 
+            unsigned int nvals = 0;
             for (;;)
             {
                 if (m_token.is(NasmToken::string_literal))
@@ -823,8 +782,25 @@ NasmParser::ParseExp()
                     Expr::Ptr e(new Expr);
                     NasmParseDataExprTerm parse_data_term;
                     if (ParseExpr(*e, &parse_data_term))
+                    {
+                        ++nvals;
+                        // Check to see if we're in a TIMES with a single data
+                        // value.  This is a very common case due to standard
+                        // macros, so we handle it specially here to speed up
+                        // the backend.
+                        if (nvals == 1 && !m_times.isEmpty() &&
+                            m_token.isEndOfStatement())
+                        {
+                            Expr::Ptr multcopy(new Expr);
+                            multcopy->swap(m_times);
+                            AppendFill(*m_times_outer_container, multcopy,
+                                       pseudo->size, e, *m_arch, exp_source,
+                                       m_preproc.getDiagnostics());
+                            break;
+                        }
                         AppendData(*m_container, e, pseudo->size, *m_arch,
                                    exp_source, m_preproc.getDiagnostics());
+                    }
                     else
                     {
                         Diag(m_token, diag::err_expected_expression_or_string);
@@ -853,12 +829,16 @@ dv_done:
             }
             if (!m_abspos.isEmpty())
                 m_absinc = MUL(pseudo->size, *e);
-            else
+            else if (!m_times.isEmpty())
             {
-                BytecodeContainer& multc =
-                    AppendMultiple(*m_container, e, exp_source);
-                multc.AppendGap(pseudo->size, exp_source);
+                // Fold in TIMES expression if we're in one.
+                *e *= m_times;
+                m_times.Clear();
+                AppendSkip(*m_times_outer_container, e, pseudo->size,
+                           exp_source);
             }
+            else
+                AppendSkip(*m_container, e, pseudo->size, exp_source);
             return true;
         }
         case PseudoInsn::INCBIN:
@@ -913,6 +893,69 @@ dv_done:
 
 incbin_done:
             AppendIncbin(*m_container, filename, start, maxlen, exp_source);
+            return true;
+        }
+        case PseudoInsn::TIMES:
+        {
+            ConsumeToken();
+            Expr multiple;
+            NasmParseDataExprTerm parse_data_term;
+            if (!ParseExpr(multiple, &parse_data_term))
+            {
+                Diag(m_token, diag::err_expected_expression_after_id)
+                    << "TIMES";
+                return false;
+            }
+            SourceLocation cursource = m_token.getLocation();
+
+            if (!m_abspos.isEmpty())
+            {
+                // In an absolute section, manipulate m_absinc directly.
+                if (!ParseExp())
+                {
+                    Diag(cursource, diag::err_expected_insn_after_times);
+                    return false;
+                }
+                m_absinc *= multiple;
+            }
+            else if (!m_times.isEmpty())
+            {
+                // Inside of another times, just multiply it out.
+                m_times *= multiple;
+                if (!ParseExp())
+                {
+                    Diag(cursource, diag::err_expected_insn_after_times);
+                    return false;
+                }
+            }
+            else
+            {
+                m_times.swap(multiple);
+
+                std::auto_ptr<BytecodeContainer>
+                    inner(new BytecodeContainer(m_container->getSection()));
+                m_times_outer_container = m_container;
+                m_container = &(*inner);
+                if (!ParseExp())
+                {
+                    Diag(cursource, diag::err_expected_insn_after_times);
+                    m_container = m_times_outer_container;
+                    m_times.Clear();
+                    return false;
+                }
+                m_container = m_times_outer_container;
+                m_times_outer_container = 0;    // to be safe
+
+                // Don't append if an inner pseudoinsn did something special.
+                if (!m_times.isEmpty() && inner->size() > 0)
+                {
+                    Expr::Ptr multcopy(new Expr);
+                    multcopy->swap(m_times);
+                    AppendMultiple(*m_container, inner, multcopy, exp_source);
+                }
+                else
+                    m_times.Clear();
+            }
             return true;
         }
         default:
@@ -1696,6 +1739,7 @@ NasmParser::DirAbsolute(DirectiveInfo& info, Diagnostic& diags)
     Object& object = info.getObject();
     m_absstart = info.getNameValues().front().getExpr(object);
     m_abspos = m_absstart;
+    m_absinc = Expr();
     object.setCurSection(0);
 }
 

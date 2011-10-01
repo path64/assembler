@@ -91,7 +91,8 @@ private:
             DECLARE_DATA,
             RESERVE_SPACE,
             INCBIN,
-            EQU
+            EQU,
+            TIMES
         };
         Type type;
         unsigned int size;
@@ -105,7 +106,6 @@ private:
     void DoParse();
     bool ParseLine();
     bool ParseDirective(/*@out@*/ NameValues& nvs);
-    bool ParseTimes(SourceLocation times_source);
     bool ParseExp();
     Insn::Ptr ParseInsn();
 
@@ -159,6 +159,13 @@ private:
 
     // Delta to add to abspos when the current line completes.
     Expr m_absinc;
+
+    // Current TIMES expression.  Empty if not in a TIMES.
+    Expr m_times;
+
+    // Original container when in a TIMES expression.
+    // TIMES replaces m_container, saving the old one here.
+    BytecodeContainer* m_times_outer_container;
 };
 
 }} // namespace yasm::parser
