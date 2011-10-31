@@ -120,6 +120,7 @@ enum ElfOsabiIndex
 {
     ELFOSABI_SYSV = 0,                          // System V ABI
     ELFOSABI_HPUX = 1,                          // HP-UX os
+    ELFOSABI_FREEBSD = 9,                       // FreeBSD ABI
     ELFOSABI_STANDALONE = 255                   // Standalone / embedded app
 };
 

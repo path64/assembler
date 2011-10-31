@@ -341,6 +341,7 @@ ElfConfig::Write(pugi::xml_node out) const
     {
         case ELFOSABI_SYSV:         osabi_str = "SYSV"; break;
         case ELFOSABI_HPUX:         osabi_str = "HPUX"; break;
+        case ELFOSABI_FREEBSD:      osabi_str = "FREEBSD"; break;
         case ELFOSABI_STANDALONE:   osabi_str = "STANDALONE"; break;
     }
     if (osabi_str)

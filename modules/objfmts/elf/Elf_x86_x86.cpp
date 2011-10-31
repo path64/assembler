@@ -105,7 +105,11 @@ Elf_x86_x86::Configure(ElfConfig* config) const
 {
     config->cls = ELFCLASS32;
     config->encoding = ELFDATA2LSB;
+#ifdef __FreeBSD__
+    config->osabi = ELFOSABI_FREEBSD;
+#else
     config->osabi = ELFOSABI_SYSV;
+#endif
     config->abi_version = 0;
     config->machine_type = EM_386;
     config->rela = false;

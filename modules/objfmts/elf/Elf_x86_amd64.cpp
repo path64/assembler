@@ -102,7 +102,11 @@ Elf_x86_amd64::Configure(ElfConfig* config) const
 {
     config->cls = ELFCLASS64;
     config->encoding = ELFDATA2LSB;
+#ifdef __FreeBSD__
+    config->osabi = ELFOSABI_FREEBSD;
+#else
     config->osabi = ELFOSABI_SYSV;
+#endif
     config->abi_version = 0;
     config->machine_type = EM_X86_64;
     config->rela = true;
