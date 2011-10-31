@@ -99,7 +99,6 @@ endif( LLVM_USING_GLIBC )
 
 check_symbol_exists(abort stdlib.h HAVE_ABORT)
 check_function_exists(getcwd HAVE_GETCWD)
-check_symbol_exists(alloca alloca.h HAVE_ALLOCA)
 check_symbol_exists(getpagesize unistd.h HAVE_GETPAGESIZE)
 check_symbol_exists(getrusage sys/resource.h HAVE_GETRUSAGE)
 check_symbol_exists(getrlimit sys/resource.h HAVE_GETRLIMIT)
