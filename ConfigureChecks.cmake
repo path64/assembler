@@ -158,8 +158,12 @@ check_type_exists(u_int64_t "${headers}" HAVE_U_INT64_T)
 include(CheckCXXCompilerFlag)
 check_cxx_compiler_flag("-fPIC" SUPPORTS_FPIC_FLAG)
 
-include(GetTargetTriple)
-get_target_triple(YASM_HOSTTRIPLE)
+if(PSC_TARGET)
+  set(YASM_HOSTTRIPLE "${PSC_TARGET}")
+else()
+  include(GetTargetTriple)
+  get_target_triple(YASM_HOSTTRIPLE)
+endif()
 message(STATUS "YASM_HOSTTRIPLE: ${YASM_HOSTTRIPLE}")
 
 # Set YGAS_OBJFMT_BASE and YGAS_OBJFMT_BITS based on YASM_HOSTTRIPLE
