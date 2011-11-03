@@ -10,11 +10,10 @@ YASM_ADD_MODULE(parser_nasm
     parsers/nasm/nasm-pp.cpp
     )
 
-GET_TARGET_PROPERTY(GENMACRO_EXE genmacro LOCATION)
 ADD_CUSTOM_COMMAND(
     OUTPUT
         ${CMAKE_CURRENT_BINARY_DIR}/nasm-macros.i
-    COMMAND ${GENMACRO_EXE} ${CMAKE_CURRENT_BINARY_DIR}/nasm-macros.i
+    COMMAND $<TARGET_FILE:genmacro> ${CMAKE_CURRENT_BINARY_DIR}/nasm-macros.i
            nasm_standard_mac
            ${CMAKE_CURRENT_SOURCE_DIR}/parsers/nasm/nasm-std.mac
     MAIN_DEPENDENCY ${CMAKE_CURRENT_SOURCE_DIR}/parsers/nasm/nasm-std.mac
