@@ -88,9 +88,9 @@ static cl::extrahelp help_tail(
     "Files are asm sources to be assembled.\n"
     "\n"
     "Sample invocation:\n"
-    "   yasm -f elf -o object.o source.asm\n"
+    "   pathas -f elf -o object.o source.asm\n"
     "\n"
-    "Report bugs to bug-yasm@tortall.net\n");
+    "Report bugs to support@pathscale.com\n");
 
 static cl::opt<std::string> in_filename(cl::Positional,
     cl::desc("file"));

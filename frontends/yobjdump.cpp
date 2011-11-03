@@ -78,7 +78,7 @@ static cl::extrahelp help_tail(
     "Sample invocation:\n"
     "   yobjdump object.o\n"
     "\n"
-    "Report bugs to bug-yasm@tortall.net\n");
+    "Report bugs to support@pathscale.com\n");
 
 static cl::list<std::string> in_filenames(cl::Positional,
     cl::desc("objfile..."));
