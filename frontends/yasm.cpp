@@ -77,7 +77,7 @@ PrintVersion()
     llvm::outs()
         << full_version << '\n'
         << "Compiled on " __DATE__ ".\n"
-        << "Copyright (c) 2009-2010 PathScale Inc. and others. All Rights Reserved.\n"
+        << "Copyright (c) 2009-2011 PathScale Inc. and others. All Rights Reserved.\n"
         << "You can find complete copyright, patent and legal notices in the "
         << "corresponding documentation.\n";
 }
@@ -836,7 +836,7 @@ main(int argc, char* argv[])
         errfile.reset(new llvm::raw_fd_ostream(error_filename.c_str(), err));
         if (!err.empty())
         {
-            llvm::errs() << "yasm: could not open file '" << error_filename
+            llvm::errs() << "pathas: could not open file '" << error_filename
                          << "': " << err << '\n';
             return EXIT_FAILURE;
         }
@@ -852,7 +852,7 @@ main(int argc, char* argv[])
     yasm::Diagnostic diags(&diag_printer);
     yasm::SourceManager source_mgr(diags);
     diags.setSourceManager(&source_mgr);
-    diag_printer.setPrefix("yasm");
+    diag_printer.setPrefix("pathas");
 
     for (std::vector<std::string>::const_iterator i=unknown_options.begin(),
          end=unknown_options.end(); i != end; ++i)
