@@ -1417,12 +1417,13 @@ ElfObject::AppendSection(llvm::StringRef name,
     }
     else if (name == ".eh_frame")
     {
+        flags = SHF_ALLOC;
 #ifdef __sun
         type = SHT_UNWIND;
+        flags |= SHF_WRITE;
 #else
         type = SHT_PROGBITS;
 #endif
-        flags = SHF_ALLOC;
     }
     else if (name == ".text")
     {
