@@ -152,6 +152,9 @@ class Test(object):
             match = False
         for i, (o, g) in enumerate(zip([ord(x) for x in result], golden)):
             if o != g:
+                # XXX Check FreeBSD OSABI in ELF header.
+                if i == 7 and o == 9 and g == 0 and os.uname()[0] == "FreeBSD":
+                    continue
                 lprint("%s:%d: mismatch: %s (expected %s)"
                         % (self.outfn, i, hex(o), hex(g)))
                 lprint("  (only the first mismatch is reported)")
