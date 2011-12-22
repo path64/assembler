@@ -1420,7 +1420,8 @@ ElfObject::AppendSection(llvm::StringRef name,
         flags = SHF_ALLOC;
 #ifdef __sun
         type = SHT_UNWIND;
-        flags |= SHF_WRITE;
+        if (m_config.cls == ELFCLASS32)
+            flags |= SHF_WRITE;
 #else
         type = SHT_PROGBITS;
 #endif
