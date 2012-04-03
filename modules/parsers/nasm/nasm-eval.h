@@ -21,7 +21,9 @@ extern yasm::Object* yasm_object;
  * The evaluator itself.
  */
 yasm::Expr *nasm_evaluate (scanner sc, void *scprivate, struct tokenval *tv,
-                          int critical, efunc report_error);
+                          int critical, efunc report_error,
+						  curl_eval _curly_evaluator);
+
 
 } // namespace nasm
 

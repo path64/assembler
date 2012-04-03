@@ -222,7 +222,11 @@ NasmParser::Parse(Object& object, Directives& dirs, Diagnostic& diags)
         return;
     }
 
-    //fputs(result.c_str(), stdout);    // for debugging
+    fputs("=================\n", stdout);
+    fputs("=================\n", stdout);
+    fputs(result.c_str(), stdout);    // for debugging
+    fputs("=================\n", stdout);
+    fputs("=================\n", stdout);
 
     // override main file with preprocessed source
     const char* filename =

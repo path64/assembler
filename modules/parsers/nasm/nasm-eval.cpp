@@ -29,6 +29,7 @@ yasm::Object *yasm_object;
 
 static scanner scan;    /* Address of scanner routine */
 static efunc error;     /* Address of error reporting routine */
+static curl_eval curly_evaluator; /*curly structure processor func*/
 
 static struct tokenval *tokval;   /* The current token */
 static int i;                     /* The t_type of tokval */
@@ -327,6 +328,17 @@ static bool expr6(Expr* e)
         }
         i = scan(scpriv, tokval);
         return true;
+    } else if (i == '{' ) {
+	    	void* saved_priv = scpriv;
+		tokenval *saved_tok = tokval;
+		int j = curly_evaluator(scpriv);
+		scpriv = saved_priv;
+		tokval = saved_tok;
+		if( j == -1)
+			return false;
+		*e = Expr(IntNum(j));
+        i = scan(scpriv, tokval);
+        return true;
     }
     else if (i == TOKEN_NUM || i == TOKEN_ID ||
              i == TOKEN_HERE || i == TOKEN_BASE)
@@ -368,7 +380,8 @@ static bool expr6(Expr* e)
 }
 
 Expr *nasm_evaluate (scanner sc, void *scprivate, struct tokenval *tv,
-                          int critical, efunc report_error)
+                          int critical, efunc report_error,
+						  curl_eval _curly_evaluator)
 {
     if (critical & CRITICAL) {
         critical &= ~CRITICAL;
@@ -376,6 +389,7 @@ Expr *nasm_evaluate (scanner sc, void *scprivate, struct tokenval *tv,
     } else
         bexpr = expr0;
 
+	curly_evaluator = _curly_evaluator;
     scan = sc;
     scpriv = scprivate;
     tokval = tv;

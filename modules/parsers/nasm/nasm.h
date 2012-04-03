@@ -163,6 +163,12 @@ struct tokenval {
 };
 typedef int (*scanner) (void *private_data, struct tokenval *tv);
 
+
+/*
+ * Processing function of {%pp_dir} structure
+ */
+typedef int (*curl_eval) (void *private_data);
+
 /*
  * Token types returned by the scanner, in addition to ordinary
  * ASCII character values, and zero for end-of-string.
@@ -204,7 +210,9 @@ enum {                                 /* token types, other than chars */
  */
 #define CRITICAL 0x100
 typedef yasm::Expr *(*evalfunc) (scanner sc, void *scprivate, struct tokenval *tv,
-                           int critical, efunc error);
+                           int critical, efunc error,
+			   curl_eval curly_evaluator);
+
 
 /*
  * Preprocessors ought to look like this:
