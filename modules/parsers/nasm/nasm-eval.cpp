@@ -51,7 +51,8 @@ static void *scpriv;
  * Grammar parsed is:
  *
  * expr  : bexpr [ WRT expr6 ]
- * bexpr : rexp0 or expr0 depending on relative-mode setting
+ * bexpr : rexpc or expr0 depending on relative-mode setting
+ * rexpc : rexp0 [ ? rexp0 : rexp0...]
  * rexp0 : rexp1 [ {||} rexp1...]
  * rexp1 : rexp2 [ {^^} rexp2...]
  * rexp2 : rexp3 [ {&&} rexp3...]
@@ -69,12 +70,57 @@ static void *scpriv;
  *       | number
  */
 
+static bool rexpc(Expr*);
 static bool rexp0(Expr*), rexp1(Expr*), rexp2(Expr*), rexp3(Expr*);
 
 static bool expr0(Expr*), expr1(Expr*), expr2(Expr*), expr3(Expr*);
 static bool expr4(Expr*), expr5(Expr*), expr6(Expr*);
 
 static bool (*bexpr)(Expr*);
+
+
+/*
+ * Added to process the !?: operand.
+ * !? is chosen instead of ? because ? can be recognised as a part or
+ * the beginning of an identifier in the nasm language.
+ */
+static bool rexpc(Expr* e)
+{
+    if (!rexp0(e))
+        return false;
+    while (i == TOKEN_TERN)
+    {
+        i = scan(scpriv, tokval);
+        Expr f, f2;
+        if (!rexp1(&f))
+            return false;
+        if (i != ':') {
+            /*
+             * FIXME: when user attempts to use floating point
+             * numbers, the dot will be an unrecognised token. If the
+             * float comes before :, then the following error line
+             * will be reported, which seems inappropriate.
+             */
+            error(ERR_FATAL, "expecting `:'");
+            return false;
+        }
+        i = scan(scpriv, tokval);
+        if (!rexp1(&f2))
+            return false;
+        /*
+         * yasm-nextgen currently has no handler for ternary operators
+         * so the e->Calc approach cannot be used here and the stuffs
+         * inside e->Calc is directly done here. Might not worth
+         * fixing anyway since the ?: is probably the only ternary
+         * operator that will be supported by yasm-nextgen
+         */
+        e->Append(f);
+        e->Append(f2);
+        e->AppendOp(yasm::Op::COND, 3);
+
+    }
+    return true;
+}
 
 static bool rexp0(Expr* e)
 {
@@ -312,6 +358,17 @@ static bool expr6(Expr* e)
             return false;
         e->Calc(yasm::Op::NOT);
         return true;
+    } else if (i == '!') {
+	/*
+	 * This LNOT operator isn't a standard part of NASM's
+	 * preprocessor expression syntax. Added here to get the work
+	 * done.
+	 */
+        i = scan(scpriv, tokval);
+        if (!expr6(e))
+            return false;
+        e->Calc(yasm::Op::LNOT);
+        return true;
     } else if (i == TOKEN_SEG) {
         i = scan(scpriv, tokval);
         if (!expr6(e))
@@ -385,7 +442,7 @@ Expr *nasm_evaluate (scanner sc, void *scprivate, struct tokenval *tv,
 {
     if (critical & CRITICAL) {
         critical &= ~CRITICAL;
-        bexpr = rexp0;
+        bexpr = rexpc;
     } else
         bexpr = expr0;
 

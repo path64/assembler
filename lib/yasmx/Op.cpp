@@ -86,6 +86,7 @@ yasm::isAssociative(Op::Op op)
         case Op::LAND:
         case Op::LXOR:
         case Op::LXNOR:
+        case Op::COND:
             return true;
         default:
             return false;

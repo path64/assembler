@@ -358,7 +358,7 @@ static int inverse_ccs[] = {
  */
 static const char *directives[] = {
     "%arg",
-    "%assign", "%clear", "%define", "%elif", "%elifctx", "%elifdef",
+    "%assign", "%clear", "%define", "%definex", "%elif", "%elifctx", "%elifdef",
     "%elifid", "%elifidn", "%elifidni", "%elifmacro", "%elifnctx", "%elifndef",
     "%elifnid", "%elifnidn", "%elifnidni", "%elifnmacro", "%elifnnum", "%elifnstr",
     "%elifnum", "%elifstr", "%else", "%endif", "%endm", "%endmacro",
@@ -375,7 +375,7 @@ static const char *directives[] = {
 enum
 {
     PP_ARG,
-    PP_ASSIGN, PP_CLEAR, PP_DEFINE, PP_ELIF, PP_ELIFCTX, PP_ELIFDEF,
+    PP_ASSIGN, PP_CLEAR, PP_DEFINE, PP_DEFINEX, PP_ELIF, PP_ELIFCTX, PP_ELIFDEF,
     PP_ELIFID, PP_ELIFIDN, PP_ELIFIDNI, PP_ELIFMACRO, PP_ELIFNCTX, PP_ELIFNDEF,
     PP_ELIFNID, PP_ELIFNIDN, PP_ELIFNIDNI, PP_ELIFNMACRO, PP_ELIFNNUM, PP_ELIFNSTR,
     PP_ELIFNUM, PP_ELIFSTR, PP_ELSE, PP_ENDIF, PP_ENDM, PP_ENDMACRO,
@@ -1489,7 +1489,8 @@ tokenise(char *line)
                     (p[0] == '<' && p[1] == '>') ||
                     (p[0] == '&' && p[1] == '&') ||
                     (p[0] == '|' && p[1] == '|') ||
-                    (p[0] == '^' && p[1] == '^'))
+                    (p[0] == '^' && p[1] == '^') ||
+		    (p[0] == '!' && p[1] == '?')) //ternary operator
             {
                 p++;
             }
@@ -1772,6 +1773,8 @@ ppscan(void *private_data, struct tokenval *tokval)
             return tokval->t_type = TOKEN_NE;
         if (!strcmp(tline->text, "!="))
             return tokval->t_type = TOKEN_NE;
+        if (!strcmp(tline->text, "!?"))
+            return tokval->t_type = TOKEN_TERN;
         if (!strcmp(tline->text, "<="))
             return tokval->t_type = TOKEN_LE;
         if (!strcmp(tline->text, ">="))
@@ -3387,9 +3390,13 @@ do_directive(Token * tline)
         case PP_IXDEFINE:
         case PP_DEFINE:
         case PP_IDEFINE:
+        case PP_DEFINEX:
             tline = tline->next;
             skip_white_(tline);
-            tline = expand_id(tline);
+            if(i!=PP_DEFINEX)
+                tline = expand_id(tline);
+            else
+                tline = expand_smacro(tline);
             if (!tline || (tline->type != TOK_ID &&
                             (tline->type != TOK_PREPROC_ID ||
                                     tline->text[1] != '$')))

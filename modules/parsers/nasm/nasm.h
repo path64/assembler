@@ -186,6 +186,7 @@ enum {                                 /* token types, other than chars */
     TOKEN_SDIV, TOKEN_SMOD,            /* // and %% */
     TOKEN_GE, TOKEN_LE, TOKEN_NE,      /* >=, <= and <> (!= is same as <>) */
     TOKEN_DBL_AND, TOKEN_DBL_OR, TOKEN_DBL_XOR,   /* &&, || and ^^ */
+    TOKEN_TERN,                        /* !? ternary condition operator*/
     TOKEN_SEG, TOKEN_WRT,              /* SEG and WRT */
     TOKEN_FLOAT                        /* floating-point constant */
 };
