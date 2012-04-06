@@ -56,6 +56,7 @@ using yasm::FileID;
 using yasm::IntNum;
 using yasm::SourceLocation;
 
+
 namespace nasm {
 
 int tasm_compatible_mode = 0;
@@ -357,7 +358,7 @@ static int inverse_ccs[] = {
  */
 static const char *directives[] = {
     "%arg",
-    "%assign", "%clear", "%define", "%elif", "%elifctx", "%elifdef",
+    "%assign", "%clear", "%define", "%definex", "%elif", "%elifctx", "%elifdef",
     "%elifid", "%elifidn", "%elifidni", "%elifmacro", "%elifnctx", "%elifndef",
     "%elifnid", "%elifnidn", "%elifnidni", "%elifnmacro", "%elifnnum", "%elifnstr",
     "%elifnum", "%elifstr", "%else", "%endif", "%endm", "%endmacro",
@@ -374,7 +375,7 @@ static const char *directives[] = {
 enum
 {
     PP_ARG,
-    PP_ASSIGN, PP_CLEAR, PP_DEFINE, PP_ELIF, PP_ELIFCTX, PP_ELIFDEF,
+    PP_ASSIGN, PP_CLEAR, PP_DEFINE, PP_DEFINEX, PP_ELIF, PP_ELIFCTX, PP_ELIFDEF,
     PP_ELIFID, PP_ELIFIDN, PP_ELIFIDNI, PP_ELIFMACRO, PP_ELIFNCTX, PP_ELIFNDEF,
     PP_ELIFNID, PP_ELIFNIDN, PP_ELIFNIDNI, PP_ELIFNMACRO, PP_ELIFNNUM, PP_ELIFNSTR,
     PP_ELIFNUM, PP_ELIFSTR, PP_ELSE, PP_ENDIF, PP_ENDM, PP_ENDMACRO,
@@ -440,6 +441,7 @@ static Line *builtindef = NULL;
 static Line *stddef = NULL;
 static Line *predef = NULL;
 static int first_line = 1;
+static int curly_opened = 0;
 
 /*
  * The number of hash values we use for the macro lookup tables.
@@ -556,6 +558,7 @@ static Token *new_Token(Token * next, int type, const char *text,
                         size_t txtlen);
 static Token *delete_Token(Token * t);
 static Token *tokenise(char *line);
+static int evaluate_curly_brackets(void *private_data);
 
 /*
  * Macros for safe checking of token pointers, avoid *(NULL)
@@ -1486,7 +1489,8 @@ tokenise(char *line)
                     (p[0] == '<' && p[1] == '>') ||
                     (p[0] == '&' && p[1] == '&') ||
                     (p[0] == '|' && p[1] == '|') ||
-                    (p[0] == '^' && p[1] == '^'))
+                    (p[0] == '^' && p[1] == '^') ||
+		    (p[0] == '!' && p[1] == '?')) //ternary operator
             {
                 p++;
             }
@@ -1769,6 +1773,8 @@ ppscan(void *private_data, struct tokenval *tokval)
             return tokval->t_type = TOKEN_NE;
         if (!strcmp(tline->text, "!="))
             return tokval->t_type = TOKEN_NE;
+        if (!strcmp(tline->text, "!?"))
+            return tokval->t_type = TOKEN_TERN;
         if (!strcmp(tline->text, "<="))
             return tokval->t_type = TOKEN_LE;
         if (!strcmp(tline->text, ">="))
@@ -2081,6 +2087,7 @@ if_condition(Token * tline, int i)
 
     switch (i)
     {
+	//affected by {} structure
         case PP_IFCTX:
         case PP_ELIFCTX:
         case PP_IFNCTX:
@@ -2103,9 +2110,11 @@ if_condition(Token * tline, int i)
             }
             if (i == PP_IFNCTX || i == PP_ELIFNCTX)
                 j = !j;
-            free_tlist(origline);
+            if(curly_opened == 0)
+                free_tlist(origline);
             return j;
 
+        //affected by {} structure
         case PP_IFDEF:
         case PP_ELIFDEF:
         case PP_IFNDEF:
@@ -2121,7 +2130,8 @@ if_condition(Token * tline, int i)
                     error(ERR_NONFATAL,
                           "`%s' expects macro identifiers",
                           directives[i]);
-                    free_tlist(origline);
+                    if(curly_opened == 0)
+                        free_tlist(origline);
                     return -1;
                 }
                 if (smacro_defined(NULL, tline->text, 0, NULL, 1))
@@ -2130,9 +2140,11 @@ if_condition(Token * tline, int i)
             }
             if (i == PP_IFNDEF || i == PP_ELIFNDEF)
                 j = !j;
-            free_tlist(origline);
+            if(curly_opened == 0)
+                free_tlist(origline);
             return j;
 
+		//affected by {} structure
         case PP_IFIDN:
         case PP_ELIFIDN:
         case PP_IFNIDN:
@@ -2150,7 +2162,8 @@ if_condition(Token * tline, int i)
                 error(ERR_NONFATAL,
                         "`%s' expects two comma-separated arguments",
                         directives[i]);
-                free_tlist(tline);
+                if(curly_opened == 0)
+                    free_tlist(tline);
                 return -1;
             }
             tt = tt->next;
@@ -2163,7 +2176,8 @@ if_condition(Token * tline, int i)
                 {
                     error(ERR_NONFATAL, "`%s': more than one comma on line",
                             directives[i]);
-                    free_tlist(tline);
+                    if(curly_opened == 0)
+                        free_tlist(tline);
                     return -1;
                 }
                 if (t->type == TOK_WHITESPACE)
@@ -2201,9 +2215,11 @@ if_condition(Token * tline, int i)
             if (i == PP_IFNIDN || i == PP_ELIFNIDN ||
                     i == PP_IFNIDNI || i == PP_ELIFNIDNI)
                 j = !j;
-            free_tlist(tline);
+            if(curly_opened == 0)
+                free_tlist(tline);
             return j;
 
+        //affected by {} structure
         case PP_IFMACRO:
         case PP_ELIFMACRO:
         case PP_IFNMACRO:
@@ -2291,12 +2307,14 @@ if_condition(Token * tline, int i)
                 mmac = mmac->next;
             }
             nasm_free(searching.name);
-            free_tlist(origline);
+            if(curly_opened == 0)
+                free_tlist(origline);
             if (i == PP_IFNMACRO || i == PP_ELIFNMACRO)
                 found = !found;
             return found;
         }
 
+        //affected by {} structure
         case PP_IFID:
         case PP_ELIFID:
         case PP_IFNID:
@@ -2340,7 +2358,8 @@ if_condition(Token * tline, int i)
                     i == PP_IFNNUM || i == PP_ELIFNNUM ||
                     i == PP_IFNSTR || i == PP_ELIFNSTR)
                 j = !j;
-            free_tlist(tline);
+			if(curly_opened == 0)
+				free_tlist(tline);
             return j;
 
         case PP_IF:
@@ -2350,8 +2369,13 @@ if_condition(Token * tline, int i)
             tptr = &t;
             tokval.t_type = TOKEN_INVALID;
             evalresult = evaluate(ppscan, tptr, &tokval, pass | CRITICAL,
-                                  error);
-            free_tlist(tline);
+                                  error, evaluate_curly_brackets);
+	    /*
+	     * Do not free if this function is invoked when processing
+	     * a {%pp_id} structure, which is part of %if*** line
+	     */
+            if(curly_opened == 0)
+                free_tlist(tline);
             if (!evalresult)
                 return -1;
             if (tokval.t_type)
@@ -2373,6 +2397,10 @@ if_condition(Token * tline, int i)
             error(ERR_FATAL,
                     "preprocessor directive `%s' not yet implemented",
                     directives[i]);
+            /* this one doesn't need check curly_opened because it is
+             * not affected at all by the {} structure. If a directive
+             * is not recognised, it won't go through to this place
+             */
             free_tlist(origline);
             return -1;          /* yeah, right */
     }
@@ -2391,6 +2419,36 @@ expand_macros_in_string(char **p)
     *p = detoken(line, FALSE);
 }
 
+/*
+ * This function uses a binary search to find out what directive tline
+ * is. It is called by do_directive() and evaluate_curly_brackets()
+ */
+static void locate_directive(int &i, int &j, int&k, Token *tline)
+{
+    int m;
+    i = -1;
+    j = elements(directives);
+    while (j - i > 1)
+    {
+        k = (j + i) / 2;
+        m = nasm_stricmp(tline->text, directives[k]);
+        if (m == 0) {
+                if (tasm_compatible_mode) {
+                i = k;
+                j = -2;
+                } else if (k != PP_ARG && k != PP_LOCAL && k != PP_STACKSIZE) {
+                    i = k;
+                j = -2;
+                }
+            break;
+        }
+        else if (m < 0) {
+            j = k;
+        }
+        else
+            i = k;
+    }
+}
 /**
  * find and process preprocessor directive in passed line
  * Find out if a line contains a preprocessor directive, and deal
@@ -2427,29 +2485,7 @@ do_directive(Token * tline)
             (tline->text[1] == '%' || tline->text[1] == '$'
                     || tline->text[1] == '!'))
         return NO_DIRECTIVE_FOUND;
-
-    i = -1;
-    j = elements(directives);
-    while (j - i > 1)
-    {
-        k = (j + i) / 2;
-        m = nasm_stricmp(tline->text, directives[k]);
-        if (m == 0) {
-                if (tasm_compatible_mode) {
-                i = k;
-                j = -2;
-                } else if (k != PP_ARG && k != PP_LOCAL && k != PP_STACKSIZE) {
-                    i = k;
-                j = -2;
-                }
-            break;
-        }
-        else if (m < 0) {
-            j = k;
-        }
-        else
-            i = k;
-    }
+    locate_directive(i,j,k, tline);
 
     /*
      * If we're in a non-emitting branch of a condition construct,
@@ -3197,8 +3233,10 @@ do_directive(Token * tline)
             tline = t;
             tptr = &t;
             tokval.t_type = TOKEN_INVALID;
-            evalresult = evaluate(ppscan, tptr, &tokval, pass, error);
-            free_tlist(tline);
+            evalresult = evaluate(ppscan, tptr, &tokval, pass, error,
+                        evaluate_curly_brackets);
+	    if(curly_opened == 0)
+		    free_tlist(tline);
             if (!evalresult)
                 return DIRECTIVE_FOUND;
             if (tokval.t_type)
@@ -3256,10 +3294,12 @@ do_directive(Token * tline)
                 t = expand_smacro(tline);
                 tptr = &t;
                 tokval.t_type = TOKEN_INVALID;
-                evalresult = evaluate(ppscan, tptr, &tokval, pass, error);
+                evalresult = evaluate(ppscan, tptr, &tokval, pass, error,
+                            evaluate_curly_brackets);
                 if (!evalresult)
                 {
-                    free_tlist(origline);
+					if(curly_opened == 0)
+					    free_tlist(origline);
                     return DIRECTIVE_FOUND;
                 }
                 if (tokval.t_type)
@@ -3350,9 +3390,13 @@ do_directive(Token * tline)
         case PP_IXDEFINE:
         case PP_DEFINE:
         case PP_IDEFINE:
+        case PP_DEFINEX:
             tline = tline->next;
             skip_white_(tline);
-            tline = expand_id(tline);
+            if(i!=PP_DEFINEX)
+                tline = expand_id(tline);
+            else
+                tline = expand_smacro(tline);
             if (!tline || (tline->type != TOK_ID &&
                             (tline->type != TOK_PREPROC_ID ||
                                     tline->text[1] != '$')))
@@ -3659,7 +3703,8 @@ do_directive(Token * tline)
             tt = t->next;
             tptr = &tt;
             tokval.t_type = TOKEN_INVALID;
-            evalresult = evaluate(ppscan, tptr, &tokval, pass, error);
+            evalresult = evaluate(ppscan, tptr, &tokval, pass, error,
+                    evaluate_curly_brackets);
             if (!evalresult)
             {
                 free_tlist(tline);
@@ -3759,8 +3804,10 @@ do_directive(Token * tline)
             t = tline;
             tptr = &t;
             tokval.t_type = TOKEN_INVALID;
-            evalresult = evaluate(ppscan, tptr, &tokval, pass, error);
-            free_tlist(tline);
+            evalresult = evaluate(ppscan, tptr, &tokval, pass, error, 
+                        evaluate_curly_brackets);
+            if(curly_opened == 0)
+                free_tlist(tline);
             if (!evalresult)
             {
                 free_tlist(origline);
@@ -4191,8 +4238,72 @@ expand_smacro(Token * tline)
     tail = &thead;
     thead = NULL;
 
+    /*
+     * curl_valid represents if we're inside a valid {%pp_dir}
+     * structure. curl_valid_opened is the number of nested {}s
+     * currently encountered
+     */
+    bool curl_valid = false;
+    int curl_valid_opened = 0;
     while (tline)
     {                           /* main token loop */
+        /* if we encounter {%if*** }, the part inside the {} won't get
+         * expanded. They are left as-is for the corresponding
+         * directive handlers to process.
+         *
+         * { needs processing both when we're in a valid  {%pp_dir}
+         * section and when we are not, as we need to keep track of
+         * the curl_valid_opened when it's valid, and inspect and mark
+         * it as valid when it's not.
+         */
+        if(tok_is_(tline, "{") )
+        {
+            if(curl_valid)
+            {
+                ++curl_valid_opened;
+                goto smacro_skip;
+            }
+
+            /* 
+             * now check for %%pp_dir to decide if it should be marked
+             * as valid
+             */
+            Token *curlstart = tline;
+            tline = tline->next;
+            skip_white_(tline);
+            if(tok_type_(tline, TOK_PREPROC_ID))
+            {
+                int i,j,k;
+                locate_directive(i, j, k, tline);
+                if(j == -2 && i >= PP_IF && i <= PP_IFSTR)
+                {
+                    curl_valid = true;
+                    curl_valid_opened = 0;
+                }
+            }
+            //put the "{ %pp_dir" into the expanded line
+            t = *tail = curlstart;
+            while(t != tline)
+            {
+                tail = &t->next;
+                t->mac = NULL;
+                t = t->next;
+            }
+            if(!tline)break;
+            goto smacro_skip;
+        }
+        else if(curl_valid)
+        {
+            if(tok_is_(tline, "}" ))
+            {
+                --curl_valid_opened;
+                if(curl_valid_opened == -1)
+                    curl_valid = false;
+            }
+            goto smacro_skip;
+        }
+
+        //start of expansion
         if ((mname = tline->text))
         {
             /* if this token is a local macro, look in local context */
@@ -4457,6 +4568,7 @@ expand_smacro(Token * tline)
         }
         else
         {
+            smacro_skip:
             t = *tail = tline;
             tline = tline->next;
             t->mac = NULL;
@@ -5392,5 +5504,109 @@ Preproc nasmpp = {
     pp_getline,
     pp_cleanup
 };
+
+/*
+ * This function processes the {%pp_dir} structure inside a
+ * preprocessor expression. It is called by nasm-eval.cpp::expr6() 
+ * A %pp_dir is a preprocessor directive that starts with %if, 
+ * including %if itself.
+ *
+ * This function cuts out the part enclosed by {}, and sends this
+ * partial line to be evaluated using if_condition() and returns the
+ * result of the evaluation. if_condition() has been modified so that
+ * it frees the partial line sent to it only when it is not evaluating
+ * something inside the {%pp_dir} structure.
+ */
+static int evaluate_curly_brackets(void *private_data)
+{
+    //t1 is a Token** that points to the first token after '{'
+    Token **t1 = (Token**)private_data;
+    //First we'll find the corresponding '}' to cut off
+    Token *t_head = *t1;
+    Token *t_end = t_head;//t_end shall be the token for '}'
+    Token *t_last = NULL; //the token before end.
+    int num_open=0, num_close = 0; //number of { and } encountered
+    int i,j;
+
+    ++curly_opened; /* informs if_condition() we're processing a 
+    {%pp_dir} so that it will not free the line sent to it */
+
+    while(t_end)
+    {
+        if(tok_is_(t_end, "}"))
+        {
+            ++num_close;
+            if( num_close > num_open )
+                break;
+        }
+        else if(tok_is_(t_end, "{"))
+            ++num_open;
+        t_last= t_end;
+        t_end = t_end->next;
+    }
+    if( num_close <= num_open)
+    {
+        error(ERR_FATAL, "{ and } must appear in pairs");
+        return -1;
+    }
+    //till this point, t_end = }, t_last is the ending token in the {}
+    if(t_head == t_end)
+    {
+        error(ERR_FATAL, "{} must contain a conditional directive");
+        return -1;
+    }
+    t_last->next = NULL; //cut it off for processing. Recover later
+    skip_white_(t_head); // enough? multiple ws?
+    if(!tok_type_(t_head, TOK_PREPROC_ID))
+    {
+        error(ERR_FATAL, "the content inside {} must start with a conditional preprocessor directive");
+        return -1;
+    }
+    
+    //Start binary search
+    int k;
+    locate_directive(i,j,k, t_head);
+    if (j != -2)
+    {
+        error(ERR_FATAL, "inside {}, unknown preprocessor directive `%s'", t_head->text);
+        return -1;
+    }
+    if( i < PP_IF || i > PP_IFSTR)
+    {
+        error(ERR_FATAL, "inside {}, only conditional preprocessor directives may be used (those that start with 'if')");
+        return -1;
+    }
+    //Only %if to %ifstr will go through to this if_condition
+    j = if_condition(t_head->next, i);
+    //stick back the part that we cut off
+    t_last->next = t_end;
+    //point private data to the unprocessed token
+    //(used in nasm-eval.cpp)
+    *t1 = t_end->next;
+    --curly_opened;
+    return j;
+}
+/* Note: 
+ * 1. Maybe the {} structure shouldn't appear in just any preprocessor
+ * expression. Maybe something should be set in 'critical' to help
+ * expr6 identify whether this structure should be recognised
+ * 2. the function above needs to verify if the curly brackets contain
+ * anything at all. It should be able to find '%' followed by an
+ * acceptable PP directive: 
+ *  if, ifctx, ifdef, ifid, ifidn, ifidni, ifmacro, ifnctx,
+ *  ifndef, ifnid, ifnidn, ifnidni, ifnmacro, ifnnum,
+ *  ifnstr, ifnum, ifstr
+ * If no %directive is found, it should report an error
+ * 3. The structure %{pp_id} will not interrupt this {%pp_dir}
+ * structure as %{pp_id} is expanded before processed. However, in
+ * case expansion fails... nasm doesn't do this properly.
+ */
+
+/* evaluate_curly_brackets structure:
+ * 1. Find the right }
+ * 2. Binary search, find the index for the contained directive
+ * 3. Call if_condition to process the identified section
+ * 4. Return result
+ */
 
 } // namespace nasm

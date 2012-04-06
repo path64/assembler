@@ -116,6 +116,7 @@ private:
 
     bool ParseSegOffExpr(Expr& e, const ParseExprTerm* parse_term = 0);
     bool ParseExpr(Expr& e, const ParseExprTerm* parse_term = 0);
+    bool ParseExprc(Expr& e, const ParseExprTerm* parse_term);
     bool ParseExpr0(Expr& e, const ParseExprTerm* parse_term);
     bool ParseExpr1(Expr& e, const ParseExprTerm* parse_term);
     bool ParseExpr2(Expr& e, const ParseExprTerm* parse_term);

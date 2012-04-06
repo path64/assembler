@@ -70,6 +70,7 @@ namespace Op
         GE,         ///< Greater than or equal to comparison.
         NE,         ///< Not equal comparison.
         NONNUM,     ///< Start of non-numeric operations (not an op).
+        COND,       ///< Ternary condition ?:
         SEG,        ///< SEG operator (gets segment portion of address).
         /// WRT operator (gets offset of address relative to some other
         /// segment).
