@@ -411,10 +411,16 @@ SkipIgnoredUnits:
         kind = NasmToken::tilde;
         break;
     case '!':
-        if (getCharAndSize(cur_ptr, &size_tmp) == '=')
+        ch = getCharAndSize(cur_ptr, &size_tmp);
+        if (ch == '=')
         {
             cur_ptr = ConsumeChar(cur_ptr, size_tmp, result);
             kind = NasmToken::exclaimequal;
+        }
+        else if (ch == '?')
+        {
+            cur_ptr = ConsumeChar(cur_ptr, size_tmp, result);
+            kind = NasmToken::tern;
         }
         else
             kind = NasmToken::exclaim;

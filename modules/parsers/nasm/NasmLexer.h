@@ -55,6 +55,7 @@ public:
         slashslash,         // //
         percentpercent,     // %%
         caretcaret,         // ^^
+        tern,               // !?
         // keywords
         kw_abs,
         kw_byte,

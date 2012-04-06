@@ -663,6 +663,41 @@ Expr::LevelOp(Diagnostic& diags, bool simplify_reg_mul, int pos)
             root.Clear();
             return;                 // End immediately since we cleared root.
         }
+        if(op == Op::COND)
+        {
+            //a !? b : c
+            if(!intchild)
+            {
+                //processing c
+                intchild = & child;
+                continue;
+            }
+            else if(!fltchild)
+            {
+                //processing b
+                fltchild = & child;
+                continue;
+            }
+            else
+            {
+                bool pickb=true;
+                //processing a
+                if(IntNum* intn = child.getIntNum())
+                    pickb = !intn->isZero();
+                else if(llvm::APFloat* fltn = child.getFloat())
+                    pickb = fltn->isNonZero();
+                else
+                {
+                    //error. For now can only process int or float
+                }
+                child.Clear();
+                if(pickb)
+                    intchild->Clear();
+                else
+                    fltchild->Clear();
+                root.AddNumChild(-2);
+            }
+        }
 
 again:
         if (IntNum* intn = child.getIntNum())
@@ -717,8 +752,9 @@ again:
         }
         else if (llvm::APFloat* fltn = child.getFloat())
         {
+            //FIXME: Should the LNOT operator work with float?
             // currently can only handle 5 basic ops: +, -, *, /, %
-            if (op >= Op::NEG)
+            if (op >= Op::NEG )
                 continue;
 
             // if there's an integer child, upconvert it

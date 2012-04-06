@@ -1244,6 +1244,7 @@ NasmParser::ParseMemoryAddress()
 //
 // expr  : bexpr [ : bexpr ]
 // bexpr : expr0 [ WRT expr6 ]
+// exprc : expr0 [ !? expr0 : expr0...]
 // expr0 : expr1 [ {|} expr1...]
 // expr1 : expr2 [ {^} expr2...]
 // expr2 : expr3 [ {&} expr3...]
@@ -1281,7 +1282,7 @@ NasmParser::ParseSegOffExpr(Expr& e, const ParseExprTerm* parse_term)
 bool
 NasmParser::ParseExpr(Expr& e, const ParseExprTerm* parse_term)
 {
-    if (!ParseExpr0(e, parse_term))
+    if (!ParseExprc(e, parse_term))
         return false;
 
     for (;;)
@@ -1299,6 +1300,32 @@ NasmParser::ParseExpr(Expr& e, const ParseExprTerm* parse_term)
         if (!ParseExpr6(f, parse_term))
             return false;
         e.Calc(Op::WRT, f);
+    }
+    return true;
+}
+
+bool
+NasmParser::ParseExprc(Expr& e, const ParseExprTerm* parse_term)
+{
+    if (!ParseExpr0(e, parse_term))
+        return false;
+    while (m_token.getKind()==NasmToken::tern)
+    {
+        SourceLocation op_source = ConsumeToken();
+        Expr f, f2;
+        if (!ParseExpr0(f, parse_term))
+            return false;
+        if (m_token.getKind() != NasmToken::colon) {
+            // FIXME: when user attempts to use floating point
+            // And error message?
+            return false;
+        }
+        ConsumeToken();
+        if (!ParseExpr0(f2, parse_term))
+            return false;
+        e.Append(f);
+        e.Append(f2);
+        e.AppendOp(Op::COND, 3, op_source);
     }
     return true;
 }
@@ -1541,6 +1568,16 @@ NasmParser::ParseExpr6(Expr& e, const ParseExprTerm* parse_term)
             if (!ParseExpr6(e, parse_term))
                 return false;
             e.Calc(Op::NEG, op_source);
+            return true;
+        }
+	//the NasmToken::exclain thing isn't a proper part 
+	//of NASM's syntax
+	case NasmToken::exclaim:
+        {
+            SourceLocation op_source = ConsumeToken();
+            if (!ParseExpr6(e, parse_term))
+                return false;
+            e.Calc(Op::LNOT, op_source);
             return true;
         }
         case NasmToken::tilde:
