@@ -580,7 +580,8 @@ GasParser::ParseDirAlign(unsigned int power2, SourceLocation source)
     Section* cur_section = m_container->getSection();
 
     // Convert power of two to number of bytes if necessary
-    if (power2)
+    if (power2 == 1
+        || (power2 == 2 && m_object->getOptions().PowerOfTwoAlignment))
         bound = SHL(1, bound);
 
     // Largest .align in the section specifies section alignment.
@@ -728,7 +729,7 @@ GasParser::ParseDirAscii(unsigned int withzero, SourceLocation source)
             IntNum val;
             if (!ParseInteger(&val))
                 return false;
-            SourceLocation val_source = ConsumeToken();
+            ConsumeToken();
             AppendByte(*m_container, val.getUInt() & 0xff);
 
             MatchRHSPunctuation(GasToken::greater, less_loc);
@@ -1449,7 +1450,7 @@ GasParser::ParseDirIfdef(unsigned int negate, SourceLocation source)
         return false;
     }
     IdentifierInfo* ii = m_token.getIdentifierInfo();
-    SourceLocation id_source = ConsumeToken();
+    ConsumeToken();
 
     bool defined = ii->isSymbol() && ii->getSymbol()->isDefined();
     HandleIf(negate ? !defined : defined, source);
@@ -1601,6 +1602,42 @@ GasParser::ParseInsn()
     return Insn::Ptr(0);
 }
 
+// Directive expression term: only difference from normal is that we look
+// at unescaped (no @ sign) labels to see if they're special.
+namespace {
+class ParseDirectiveExprTerm : public ParseExprTerm
+{
+    Object& m_object;
+public:
+    ParseDirectiveExprTerm(Object& object) : m_object(object) {}
+    ~ParseDirectiveExprTerm() {}
+
+    bool operator() (Expr& e, ParserImpl& parser, bool* handled) const;
+};
+} // anonymous namespace
+
+bool
+ParseDirectiveExprTerm::operator()
+    (Expr& e, ParserImpl& parser, bool* handled) const
+{
+    if (parser.m_token.is(GasToken::identifier) ||
+        parser.m_token.is(GasToken::label))
+    {
+        IdentifierInfo* ii = parser.m_token.getIdentifierInfo();
+        SymbolRef sym = m_object.FindSpecialSymbol(ii->getName());
+        if (sym)
+        {
+            SourceLocation id_source = parser.ConsumeToken();
+            e = Expr(sym, id_source);
+            *handled = true;
+            return true;
+        }
+    }
+
+    *handled = false;
+    return true;
+}
+
 bool
 GasParser::ParseDirective(NameValues* nvs)
 {
@@ -1625,7 +1662,8 @@ GasParser::ParseDirective(NameValues* nvs)
                     {
                         SourceLocation e_src = m_token.getLocation();
                         Expr::Ptr e(new Expr);
-                        if (!ParseExpr(*e))
+                        ParseDirectiveExprTerm parse_term(*m_object);
+                        if (!ParseExpr(*e, &parse_term))
                             return false;
                         nvs->push_back(new NameValue(e));
                         nvs->back().setValueRange(
@@ -1678,7 +1716,7 @@ GasParser::ParseDirective(NameValues* nvs)
                 }
                 if (const RegisterGroup* reggroup = ii->getRegGroup())
                 {
-                    SourceLocation reggroup_source = ConsumeToken();
+                    ConsumeToken();
 
                     if (m_token.isNot(GasToken::l_paren))
                     {
@@ -1721,7 +1759,8 @@ GasParser::ParseDirective(NameValues* nvs)
             {
                 SourceLocation e_src = m_token.getLocation();
                 Expr::Ptr e(new Expr);
-                if (!ParseExpr(*e))
+                ParseDirectiveExprTerm parse_term(*m_object);
+                if (!ParseExpr(*e, &parse_term))
                     return false;
                 nvs->push_back(new NameValue(e));
                 nvs->back().setValueRange(
@@ -1905,7 +1944,7 @@ GasParser::ParseRegOperand()
     }
     if (const RegisterGroup* reggroup = ii->getRegGroup())
     {
-        SourceLocation reggroup_source = ConsumeToken();
+        ConsumeToken();
 
         if (m_token.isNot(GasToken::l_paren))
             return Operand(reggroup->getReg(0));

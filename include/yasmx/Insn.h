@@ -50,7 +50,7 @@ class Register;
 class SegmentRegister;
 
 /// Base class for target modifiers.
-class YASM_LIB_EXPORT TargetModifier : public DebugDumper<TargetModifier>
+class YASM_LIB_EXPORT TargetModifier
 {
 public:
     TargetModifier() {}
@@ -71,7 +71,7 @@ private:
 };
 
 /// An instruction operand.
-class YASM_LIB_EXPORT Operand : public DebugDumper<Operand>
+class YASM_LIB_EXPORT Operand
 {
 public:
     /// Operand type.
@@ -258,7 +258,7 @@ private:
 };
 
 /// Base class for instruction prefixes.
-class YASM_LIB_EXPORT Prefix : public DebugDumper<Prefix>
+class YASM_LIB_EXPORT Prefix
 {
 public:
     Prefix() {}
@@ -279,7 +279,7 @@ private:
 
 /// Base class for instructions.  Architectures should
 /// derive their own implementation from this.
-class YASM_LIB_EXPORT Insn : public DebugDumper<Insn>
+class YASM_LIB_EXPORT Insn
 {
 public:
     typedef std::auto_ptr<Insn> Ptr;

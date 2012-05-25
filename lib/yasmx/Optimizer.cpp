@@ -162,7 +162,7 @@ using namespace yasm;
 // 3. Final pass over bytecodes to generate final offsets.
 //
 namespace {
-class OffsetSetter : public DebugDumper<OffsetSetter>
+class OffsetSetter
 {
 public:
     OffsetSetter();
@@ -201,12 +201,12 @@ OffsetSetter::Write(pugi::xml_node out) const
 #endif // WITH_XML
 
 namespace {
-class Span : public DebugDumper<Span>
+class Span
 {
     friend class Optimizer;
     friend class Optimizer::Impl;
 public:
-    class Term : public DebugDumper<Span::Term>
+    class Term
     {
     public:
         Term();
@@ -281,7 +281,7 @@ private:
 } // anonymous namespace
 
 namespace yasm {
-class Optimizer::Impl : public DebugDumper<Optimizer::Impl>
+class Optimizer::Impl
 {
 public:
     Impl(Diagnostic& diags);
@@ -572,7 +572,7 @@ Optimizer::Impl::Write(pugi::xml_node out) const
     pugi::xml_node qb = root.append_child("QueueB");
     for (SpanQueue::const_iterator k=m_QB.begin(), end=m_QB.end();
          k != end; ++k)
-        (*k)->WriteRef(qa);
+        (*k)->WriteRef(qb);
 
     // offset setters
     pugi::xml_node osetters = root.append_child("OffsetSetters");
@@ -830,7 +830,7 @@ Optimizer::Impl::Step1e()
 void
 Optimizer::Impl::Step2()
 {
-    DEBUG(Dump());
+    DEBUG(DumpXml(*this));
 
     while (!m_QA.empty() || !m_QB.empty())
     {

@@ -52,7 +52,7 @@ class Section;
 class Symbol;
 
 /// An object.  This is the internal representation of an object file.
-class YASM_LIB_EXPORT Object : public DebugDumper<Object>
+class YASM_LIB_EXPORT Object
 {
 public:
     /// Options to control behavior of various functions globally for
@@ -64,6 +64,9 @@ public:
         /// to be generated even if the symbol is in the same section as
         /// the value.  Defaults to false.
         bool DisableGlobalSubRelative;
+
+        /// Alignment directives specify power-of-2.  Defaults to false.
+        bool PowerOfTwoAlignment;
     };
 
     /// Generic object configuration.
