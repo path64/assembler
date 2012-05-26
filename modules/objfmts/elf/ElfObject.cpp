@@ -42,6 +42,10 @@
 //
 #include "ElfObject.h"
 
+#ifdef __FreeBSD__
+#include <sys/param.h>
+#endif
+
 #include "llvm/ADT/SmallString.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/raw_ostream.h"
@@ -1601,7 +1605,12 @@ ElfObject::DirGasSection(DirectiveInfo& info, Diagnostic& diags)
         else if (typestr == "preinit_array")
             type = SHT_PREINIT_ARRAY;
         else if (typestr == "unwind")
+#if defined(__FreeBSD_version) && __FreeBSD_version < 900000
+            // work around a bug in ld 2.15
+            type = SHT_PROGBITS;
+#else
             type = SHT_UNWIND;
+#endif
         ++nv;
     }
 
