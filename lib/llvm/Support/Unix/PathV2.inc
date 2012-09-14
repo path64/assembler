@@ -542,7 +542,7 @@ mapped_file_region::mapped_file_region(int fd,
 
 mapped_file_region::~mapped_file_region() {
   if (Mapping)
-    ::munmap(Mapping, Size);
+    ::munmap(static_cast<char*>(Mapping), Size);
 }
 
 #if LLVM_USE_RVALUE_REFERENCES
@@ -670,7 +670,7 @@ error_code map_file_pages(const Twine &path, off_t file_offset, size_t size,
 }
 
 error_code unmap_file_pages(void *base, size_t size) {
-  if ( ::munmap(base, size) == -1 )
+  if ( ::munmap(static_cast<char*>(base), size) == -1 )
     return error_code(errno, system_category());
    
   return error_code::success();
