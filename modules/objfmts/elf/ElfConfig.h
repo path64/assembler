@@ -33,13 +33,11 @@
 #include "ElfTypes.h"
 
 
-namespace llvm { class MemoryBuffer; }
-
 namespace yasm
 {
 
 class Bytes;
-class Diagnostic;
+class DiagnosticsEngine;
 class EndianState;
 class Object;
 class Section;
@@ -78,23 +76,23 @@ struct YASM_STD_EXPORT ElfConfig
     ~ElfConfig() {}
 
     unsigned long getProgramHeaderSize() const;
-    bool ReadProgramHeader(const llvm::MemoryBuffer& in);
-    void WriteProgramHeader(llvm::raw_ostream& os, Bytes& scratch);
+    bool ReadProgramHeader(const MemoryBuffer& in);
+    void WriteProgramHeader(raw_ostream& os, Bytes& scratch);
 
     ElfSymbolIndex AssignSymbolIndices(Object& object, ElfSymbolIndex* nlocal)
         const;
 
-    unsigned long WriteSymbolTable(llvm::raw_ostream& os,
+    unsigned long WriteSymbolTable(raw_ostream& os,
                                    Object& object,
-                                   Diagnostic& diags,
+                                   DiagnosticsEngine& diags,
                                    Bytes& scratch) const;
-    bool ReadSymbolTable(const llvm::MemoryBuffer&  in,
-                         const ElfSection&          symtab_sect,
-                         ElfSymtab&                 symtab,
-                         Object&                    object,
-                         const StringTable&         strtab,
-                         Section*                   sections[],
-                         Diagnostic&                diags) const;
+    bool ReadSymbolTable(const MemoryBuffer&    in,
+                         const ElfSection&      symtab_sect,
+                         ElfSymtab&             symtab,
+                         Object&                object,
+                         const StringTable&     strtab,
+                         Section*               sections[],
+                         DiagnosticsEngine&     diags) const;
 
     std::string getRelocSectionName(const std::string& basesect) const;
 

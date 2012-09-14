@@ -34,6 +34,7 @@
 
 #include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/SmallVector.h"
+#include "yasmx/Basic/LLVM.h"
 #include "yasmx/Basic/SourceLocation.h"
 #include "yasmx/Config/export.h"
 #include "yasmx/DebugDumper.h"
@@ -43,13 +44,13 @@
 #include "yasmx/SymbolRef.h"
 
 
-namespace llvm { class APFloat; class raw_ostream; struct fltSemantics; }
+namespace llvm { class APFloat; struct fltSemantics; }
 
 namespace yasm
 {
 
 class Bytecode;
-class Diagnostic;
+class DiagnosticsEngine;
 class Expr;
 class ExprTest;
 class Register;
@@ -270,7 +271,7 @@ public:
     /// Print to stream.
     /// @param os           output stream
     /// @param base         numeric base (10=decimal, etc)
-    void Print(llvm::raw_ostream& os, int base=10) const;
+    void Print(raw_ostream& os, int base=10) const;
 
 private:
     /// Expression item data.  Correct value depends on type.
@@ -296,7 +297,7 @@ public:
     int m_depth;                ///< Depth in tree.
 };
 
-typedef llvm::SmallVector<ExprTerm, 3> ExprTerms;
+typedef SmallVector<ExprTerm, 3> ExprTerms;
 
 inline ExprTerm&
 ExprTerm::operator= (const ExprTerm& rhs)
@@ -452,7 +453,7 @@ public:
     /// branches and simplifies integer-only subexpressions.  Does *not*
     /// expand EQUs; use ExpandEqu() in expr_util.h to first expand EQUs.
     /// @param simplify_reg_mul simplify REG*1 identities
-    void Simplify(Diagnostic& diags, bool simplify_reg_mul = true);
+    void Simplify(DiagnosticsEngine& diags, bool simplify_reg_mul = true);
 
     /// Simplify an expression as much as possible, taking a functor for
     /// additional processing.  Calls LevelOp() both before and after the
@@ -461,8 +462,8 @@ public:
     ///                         called as (Expr&, int pos)
     /// @param simplify_reg_mul simplify REG*1 identities
     template <typename T>
-    void Simplify(Diagnostic& diags,
-                  const T& func,
+    void Simplify(DiagnosticsEngine& diags,
+                  T& func,
                   bool simplify_reg_mul = true);
 
     /// Extract the segment portion of an expression containing SEG:OFF,
@@ -584,7 +585,7 @@ public:
 
     /// Make expression an ident if it only has one term.
     /// @param pos      index of operator term, may be negative for "from end"
-    void MakeIdent(Diagnostic& diags, int pos=-1);
+    void MakeIdent(DiagnosticsEngine& diags, int pos=-1);
 
     /// Levels an expression tree.
     /// a+(b+c) -> a+b+c
@@ -595,7 +596,7 @@ public:
     ///       post-order on a tree to combine deeper levels.
     /// @param simplify_reg_mul simplify REG*1 identities
     /// @param pos              index of top-level operator term
-    void LevelOp(Diagnostic& diags, bool simplify_reg_mul, int pos=-1);
+    void LevelOp(DiagnosticsEngine& diags, bool simplify_reg_mul, int pos=-1);
 
     //@}
 
@@ -609,7 +610,7 @@ public:
     /// Print to stream.
     /// @param os           output stream
     /// @param base         numeric base (10=decimal, etc)
-    void Print(llvm::raw_ostream& os, int base=10) const;
+    void Print(raw_ostream& os, int base=10) const;
 
     /// Clean up terms by removing all empty (ExprTerm::NONE) elements.
     void Cleanup();
@@ -618,25 +619,10 @@ private:
     /// Terms of the expression.  The entire tree is stored here.
     ExprTerms m_terms;
 
-    /// Reduce depth of a subexpression.
-    /// @param pos      term index of subexpression operator
-    /// @param delta    delta to reduce depth by
-    void ReduceDepth(int pos, int delta=1);
-
-    /// Clear all terms of a subexpression, possibly keeping a single term.
-    /// @param pos      term index of subexpression operator
-    /// @param keep     term index of term to keep; -1 to clear all terms
-    void ClearExcept(int pos, int keep=-1);
-
     /// Transform all Op::SUB and Op::NEG subexpressions into appropriate *-1
     /// variants.  This assists with operator leveling as it transforms the
     /// nonlevelable Op::SUB into the levelable Op::ADD.
     void TransformNeg();
-
-    /// LHS expression extractor.
-    /// @param op   reverse iterator pointing at operator term to be extracted
-    ///             from
-    Expr ExtractLHS(ExprTerms::reverse_iterator op);
 };
 
 /// Assign to expression.
@@ -718,7 +704,7 @@ inline void Expr::Append(const ExprTerm& term)
 
 template <typename T>
 void
-Expr::Simplify(Diagnostic& diags, const T& func, bool simplify_reg_mul)
+Expr::Simplify(DiagnosticsEngine& diags, T& func, bool simplify_reg_mul)
 {
     TransformNeg();
 
@@ -922,15 +908,15 @@ template <typename T> inline Expr& operator>>=(Expr& lhs, const T& rhs)
 template <typename T> inline Expr& operator<<=(Expr& lhs, const T& rhs)
 { lhs.Calc(Op::SHL, rhs); return lhs; }
 
-inline llvm::raw_ostream&
-operator<< (llvm::raw_ostream& os, const ExprTerm& term)
+inline raw_ostream&
+operator<< (raw_ostream& os, const ExprTerm& term)
 {
     term.Print(os);
     return os;
 }
 
-inline llvm::raw_ostream&
-operator<< (llvm::raw_ostream& os, const Expr& e)
+inline raw_ostream&
+operator<< (raw_ostream& os, const Expr& e)
 {
     e.Print(os);
     return os;
@@ -948,7 +934,7 @@ bool CalcFloat(llvm::APFloat* lhs,
                Op::Op op,
                const llvm::APFloat& rhs,
                SourceLocation source,
-               Diagnostic& diags);
+               DiagnosticsEngine& diags);
 
 /// Get left and right hand immediate children, or single immediate child.
 /// @param e        Expression

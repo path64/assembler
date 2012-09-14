@@ -35,9 +35,12 @@
 #include "llvm/Support/ManagedStatic.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/raw_ostream.h"
+#include "llvm/Support/system_error.h"
 #include "yasmx/Basic/Diagnostic.h"
 #include "yasmx/Basic/FileManager.h"
 #include "yasmx/Basic/SourceManager.h"
+#include "yasmx/Frontend/DiagnosticOptions.h"
+#include "yasmx/Frontend/TextDiagnosticPrinter.h"
 #include "yasmx/Parse/DirectoryLookup.h"
 #include "yasmx/Parse/HeaderSearch.h"
 #include "yasmx/Parse/Parser.h"
@@ -57,16 +60,15 @@
 #endif
 
 #include "frontends/license.cpp"
-#include "frontends/DiagnosticOptions.h"
-#include "frontends/TextDiagnosticPrinter.h"
 
 
 // Preprocess-only buffer size
 #define PREPROC_BUF_SIZE    16384
 
+using namespace yasm;
 namespace cl = llvm::cl;
 
-static std::auto_ptr<llvm::raw_ostream> errfile;
+static std::auto_ptr<raw_ostream> errfile;
 
 // version message
 static const char* full_version =
@@ -118,21 +120,21 @@ static cl::alias predefine_macros_alias("d",
 
 #ifdef WITH_XML
 // -dump-object
-static llvm::cl::opt<yasm::Assembler::ObjectDumpTime> dump_object("dump-object",
-    llvm::cl::desc("Dump object in XML after this phase:"),
-    llvm::cl::values(
-        clEnumValN(yasm::Assembler::DUMP_NEVER, "never", "never dump"),
-        clEnumValN(yasm::Assembler::DUMP_AFTER_PARSE, "parsed",
+static cl::opt<Assembler::ObjectDumpTime> dump_object("dump-object",
+    cl::desc("Dump object in XML after this phase:"),
+    cl::values(
+        clEnumValN(Assembler::DUMP_NEVER, "never", "never dump"),
+        clEnumValN(Assembler::DUMP_AFTER_PARSE, "parsed",
                    "after parse phase"),
-        clEnumValN(yasm::Assembler::DUMP_AFTER_FINALIZE, "finalized",
+        clEnumValN(Assembler::DUMP_AFTER_FINALIZE, "finalized",
                    "after finalization"),
-        clEnumValN(yasm::Assembler::DUMP_AFTER_OPTIMIZE, "optimized",
+        clEnumValN(Assembler::DUMP_AFTER_OPTIMIZE, "optimized",
                    "after optimization"),
-        clEnumValN(yasm::Assembler::DUMP_AFTER_OUTPUT, "output",
+        clEnumValN(Assembler::DUMP_AFTER_OUTPUT, "output",
                    "after output"),
         clEnumValEnd));
 #else
-yasm::Assembler::ObjectDumpTime dump_object = yasm::Assembler::DUMP_NEVER;
+Assembler::ObjectDumpTime dump_object = Assembler::DUMP_NEVER;
 #endif // WITH_XML
 
 // -E
@@ -311,20 +313,20 @@ static cl::list<bool> inhibit_warnings("w",
     cl::desc("Inhibits warning messages"));
 
 // -X
-enum ErrwarnStyle
-{
-    EWSTYLE_GNU = 0,
-    EWSTYLE_VC
-};
-static cl::opt<ErrwarnStyle> ewmsg_style("X",
+static cl::opt<DiagnosticOptions::TextDiagnosticFormat> ewmsg_style("X",
     cl::desc("Set error/warning message style:"),
     cl::Prefix,
     cl::ZeroOrMore,
-    cl::init(EWSTYLE_GNU),
+    cl::init(DiagnosticOptions::Clang),
     cl::values(
-     clEnumValN(EWSTYLE_GNU, "gnu", "GNU (GCC) error/warning style (default)"),
-     clEnumValN(EWSTYLE_GNU, "gcc", "Alias for gnu"),
-     clEnumValN(EWSTYLE_VC,  "vc",  "Visual Studio error/warning style"),
+     clEnumValN(DiagnosticOptions::Clang, "gnu",
+                "GNU (GCC) error/warning style (default)"),
+     clEnumValN(DiagnosticOptions::Clang, "gcc", "Alias for gnu"),
+     clEnumValN(DiagnosticOptions::Msvc, "vc",
+                "Visual Studio error/warning style"),
+     clEnumValN(DiagnosticOptions::Msvc, "msvc",
+                "Alias for vc"),
+     clEnumValN(DiagnosticOptions::Vi, "vi", "Vi error/warning style"),
      clEnumValEnd));
 
 // sink to warn instead of error on unrecognized options
@@ -341,28 +343,27 @@ template <typename T>
 static void
 ListModule()
 {
-    yasm::ModuleNames list = yasm::getModules<T>();
-    for (yasm::ModuleNames::iterator i=list.begin(), end=list.end();
-         i != end; ++i)
+    ModuleNames list = getModules<T>();
+    for (ModuleNames::iterator i=list.begin(), end=list.end(); i != end; ++i)
     {
-        std::auto_ptr<T> obj = yasm::LoadModule<T>(*i);
+        std::auto_ptr<T> obj = LoadModule<T>(*i);
         PrintListKeywordDesc(obj->getName(), *i);
     }
 }
 
 template <typename T>
 static std::string
-ModuleCommonHandler(const std::string& param,
+ModuleCommonHandler(StringRef param,
                     const char* name,
                     const char* name_plural,
                     bool* listed,
-                    yasm::Diagnostic& diags)
+                    DiagnosticsEngine& diags)
 {
     if (param.empty())
         return param;
 
-    std::string keyword = llvm::LowercaseString(param);
-    if (!yasm::isModule<T>(keyword))
+    std::string keyword = param.lower();
+    if (!isModule<T>(keyword))
     {
         if (param == "help")
         {
@@ -371,14 +372,14 @@ ModuleCommonHandler(const std::string& param,
             *listed = true;
             return keyword;
         }
-        diags.Report(yasm::diag::fatal_unrecognized_module) << name << param;
+        diags.Report(diag::fatal_unrecognized_module) << name << param;
         exit(EXIT_FAILURE);
     }
     return keyword;
 }
 
 static void
-ApplyWarningSettings(yasm::Diagnostic& diags)
+ApplyWarningSettings(DiagnosticsEngine& diags)
 {
     // Walk through warning_settings and inhibit_warnings in parallel,
     // ordering by command line argument position.
@@ -405,59 +406,75 @@ ApplyWarningSettings(yasm::Diagnostic& diags)
         else if (setting_pos != 0 &&
                  (inhibit_pos == 0 || setting_pos < inhibit_pos))
         {
-            llvm::StringRef setting(warning_settings[setting_num]);
+            StringRef setting(warning_settings[setting_num]);
 
-            yasm::diag::Mapping mapping = yasm::diag::MAP_WARNING;
-            bool positive = true;
+            diag::Mapping mapping = diag::MAP_WARNING;
+            bool enabled = true;
             if (setting.startswith("no-"))
             {
-                positive = false;
-                mapping = yasm::diag::MAP_IGNORE;
+                enabled = false;
+                mapping = diag::MAP_IGNORE;
                 setting = setting.substr(3);
             }
 
             if (setting.startswith("error"))
             {
-                llvm::StringRef unused;
+                StringRef unused;
                 llvm::tie(unused, setting) = setting.split('=');
                 // Just plain -Werror maps all warnings to errors.
                 // -Werror=foo/-Wno-error=foo maps warning foo.
                 if (setting.empty())
                 {
-                    diags.setWarningsAsErrors(positive);
+                    diags.setWarningsAsErrors(enabled);
                     ++setting_num;
                     continue;
                 }
+                else if (!diags.setDiagnosticGroupWarningAsError(setting,
+                                                                 enabled))
+                {
+                    ++setting_num;
+                    continue;
+                }
+#if 0
                 else
                 {
-                    mapping = positive ? yasm::diag::MAP_ERROR
-                                       : yasm::diag::MAP_WARNING_NO_WERROR;
+                    diags.setDiagnosticWarningAsError(enabled);
+                    ++setting_num;
+                    continue;
                 }
+#endif
             }
-#if 0
             else if (setting.startswith("fatal-errors"))
             {
-                llvm::StringRef unused;
+                StringRef unused;
                 llvm::tie(unused, setting) = setting.split('=');
                 // Just plain -Wfatal-error maps all errors to fatal errors.
                 // -Wfatal-errors=foo/-Wno-fatal-errors=foo maps just foo.
                 if (setting.empty())
                 {
-                    diags.setErrorsAsFatal(positive);
+                    diags.setErrorsAsFatal(enabled);
                     ++setting_num;
                     continue;
                 }
+                else if (!diags.setDiagnosticGroupErrorAsFatal(setting,
+                                                               enabled))
+                {
+                    ++setting_num;
+                    continue;
+                }
+#if 0
                 else
                 {
-                    mapping = positive ? yasm::diag::MAP_FATAL
-                                       : yasm::diag::MAP_ERROR_NO_WFATAL;
+                    diags.setDiagnosticErrorAsFatal(enabled);
+                    ++setting_num;
+                    continue;
                 }
-            }
 #endif
+            }
 
             if (diags.setDiagnosticGroupMapping(setting, mapping))
-                diags.Report(yasm::SourceLocation(),
-                             yasm::diag::warn_unknown_warning_option)
+                diags.Report(SourceLocation(),
+                             diag::warn_unknown_warning_option)
                     << ("-W" + warning_settings[setting_num]);
             ++setting_num;
         }
@@ -467,9 +484,9 @@ ApplyWarningSettings(yasm::Diagnostic& diags)
 }
 
 static void
-ConfigureObject(yasm::Object& object)
+ConfigureObject(Object& object)
 {
-    yasm::Object::Config& config = object.getConfig();
+    Object::Config& config = object.getConfig();
 
     // Walk through execstack and noexecstack in parallel, ordering by command
     // line argument position.
@@ -506,7 +523,7 @@ ConfigureObject(yasm::Object& object)
 }
 
 static void
-ApplyPreprocessorBuiltins(yasm::Preprocessor& preproc)
+ApplyPreprocessorBuiltins(Preprocessor& preproc)
 {
     // Define standard YASM assembly-time macro constants
     std::string predef("__YASM_OBJFMT__=");
@@ -515,7 +532,7 @@ ApplyPreprocessorBuiltins(yasm::Preprocessor& preproc)
 }
 
 static void
-ApplyPreprocessorSavedOptions(yasm::Preprocessor& preproc)
+ApplyPreprocessorSavedOptions(Preprocessor& preproc)
 {
     // Walk through predefine_macros, undefine_macros, and preinclude_files
     // in parallel, ordering by command line argument position.
@@ -676,14 +693,14 @@ do_preproc_only(void)
 }
 #endif
 static int
-do_assemble(yasm::SourceManager& source_mgr, yasm::Diagnostic& diags)
+do_assemble(SourceManager& source_mgr, DiagnosticsEngine& diags)
 {
     // Apply warning settings
     ApplyWarningSettings(diags);
 
-    yasm::FileManager file_mgr;
-    yasm::Assembler assembler(arch_keyword, objfmt_keyword, diags, dump_object);
-    yasm::HeaderSearch headers(file_mgr);
+    Assembler assembler(arch_keyword, objfmt_keyword, diags, dump_object);
+    FileManager& file_mgr = source_mgr.getFileManager();
+    HeaderSearch headers(file_mgr);
 
     if (diags.hasFatalErrorOccurred())
         return EXIT_FAILURE;
@@ -710,11 +727,11 @@ do_assemble(yasm::SourceManager& source_mgr, yasm::Diagnostic& diags)
         return EXIT_FAILURE;
 
     // Set up header search paths
-    std::vector<yasm::DirectoryLookup> dirs;
+    std::vector<DirectoryLookup> dirs;
     for (std::vector<std::string>::iterator i = include_paths.begin(),
          end = include_paths.end(); i != end; ++i)
     {
-        dirs.push_back(yasm::DirectoryLookup(file_mgr.getDirectory(*i), true));
+        dirs.push_back(DirectoryLookup(file_mgr.getDirectory(*i), true));
     }
     headers.SetSearchPaths(dirs, 0, false);
 
@@ -723,18 +740,25 @@ do_assemble(yasm::SourceManager& source_mgr, yasm::Diagnostic& diags)
     // open the input file or STDIN (for filename of "-")
     if (in_filename == "-")
     {
-        source_mgr.createMainFileIDForMemBuffer(llvm::MemoryBuffer::getSTDIN());
+        OwningPtr<MemoryBuffer> my_stdin;
+        if (llvm::error_code err = MemoryBuffer::getSTDIN(my_stdin))
+        {
+            diags.Report(SourceLocation(), diag::fatal_file_open)
+                << in_filename << err.message();
+            return EXIT_FAILURE;
+        }
+        source_mgr.createMainFileIDForMemBuffer(my_stdin.take());
     }
     else
     {
-        const yasm::FileEntry* in = file_mgr.getFile(in_filename);
+        const FileEntry* in = file_mgr.getFile(in_filename);
         if (!in)
         {
-            diags.Report(yasm::SourceLocation(), yasm::diag::fatal_file_open)
+            diags.Report(SourceLocation(), diag::fatal_file_open)
                 << in_filename;
             return EXIT_FAILURE;
         }
-        source_mgr.createMainFileID(in, yasm::SourceLocation());
+        source_mgr.createMainFileID(in);
     }
 
     // initialize the object.
@@ -745,7 +769,7 @@ do_assemble(yasm::SourceManager& source_mgr, yasm::Diagnostic& diags)
     ConfigureObject(*assembler.getObject());
 
     // initialize the parser.
-    yasm::Parser& parser = assembler.InitParser(source_mgr, diags, headers);
+    Parser& parser = assembler.InitParser(source_mgr, diags, headers);
     ApplyPreprocessorBuiltins(parser.getPreprocessor());
     ApplyPreprocessorSavedOptions(parser.getPreprocessor());
     if (diags.hasErrorOccurred())
@@ -760,11 +784,11 @@ do_assemble(yasm::SourceManager& source_mgr, yasm::Diagnostic& diags)
 
     // open the object file for output
     std::string err;
-    llvm::raw_fd_ostream out(assembler.getObjectFilename().str().c_str(),
-                             err, llvm::raw_fd_ostream::F_Binary);
+    raw_fd_ostream out(assembler.getObjectFilename().str().c_str(),
+                             err, raw_fd_ostream::F_Binary);
     if (!err.empty())
     {
-        diags.Report(yasm::SourceLocation(), yasm::diag::err_cannot_open_file)
+        diags.Report(SourceLocation(), diag::err_cannot_open_file)
             << obj_filename << err;
         return EXIT_FAILURE;
     }
@@ -833,7 +857,7 @@ main(int argc, char* argv[])
     else if (!error_filename.empty())
     {
         std::string err;
-        errfile.reset(new llvm::raw_fd_ostream(error_filename.c_str(), err));
+        errfile.reset(new raw_fd_ostream(error_filename.c_str(), err));
         if (!err.empty())
         {
             llvm::errs() << "pathas: could not open file '" << error_filename
@@ -844,26 +868,29 @@ main(int argc, char* argv[])
     else
         errfile.reset(new llvm::raw_stderr_ostream);
 
-    yasm::DiagnosticOptions diag_opts;
-    diag_opts.Microsoft = (ewmsg_style == EWSTYLE_VC);
+    DiagnosticOptions diag_opts;
+    diag_opts.Format = ewmsg_style;
     diag_opts.ShowOptionNames = 1;
     diag_opts.ShowSourceRanges = 1;
-    yasm::TextDiagnosticPrinter diag_printer(*errfile, diag_opts);
-    yasm::Diagnostic diags(&diag_printer);
-    yasm::SourceManager source_mgr(diags);
+    TextDiagnosticPrinter diag_printer(*errfile, diag_opts);
+    IntrusiveRefCntPtr<DiagnosticIDs> diagids(new DiagnosticIDs);
+    DiagnosticsEngine diags(diagids, &diag_printer, false);
+    FileSystemOptions opts;
+    FileManager file_mgr(opts);
+    SourceManager source_mgr(diags, file_mgr);
     diags.setSourceManager(&source_mgr);
     diag_printer.setPrefix("pathas");
 
     for (std::vector<std::string>::const_iterator i=unknown_options.begin(),
          end=unknown_options.end(); i != end; ++i)
     {
-        diags.Report(yasm::diag::warn_unknown_command_line_option) << *i;
+        diags.Report(diag::warn_unknown_command_line_option) << *i;
     }
 
     // Load standard modules
-    if (!yasm::LoadStandardPlugins())
+    if (!LoadStandardPlugins())
     {
-        diags.Report(yasm::diag::fatal_standard_modules);
+        diags.Report(diag::fatal_standard_modules);
         return EXIT_FAILURE;
     }
 
@@ -872,22 +899,22 @@ main(int argc, char* argv[])
     for (std::vector<std::string>::const_iterator i=plugin_names.begin(),
          end=plugin_names.end(); i != end; ++i)
     {
-        if (!yasm::LoadPlugin(*i))
-            diags.Report(yasm::diag::warn_plugin_load) << *i;
+        if (!LoadPlugin(*i))
+            diags.Report(diag::warn_plugin_load) << *i;
     }
 #endif
 
     // Handle keywords (including "help").
     bool listed = false;
-    arch_keyword = ModuleCommonHandler<yasm::ArchModule>
+    arch_keyword = ModuleCommonHandler<ArchModule>
         (arch_keyword, "architecture", "architectures", &listed, diags);
-    parser_keyword = ModuleCommonHandler<yasm::ParserModule>
+    parser_keyword = ModuleCommonHandler<ParserModule>
         (parser_keyword, "parser", "parsers", &listed, diags);
-    objfmt_keyword = ModuleCommonHandler<yasm::ObjectFormatModule>
+    objfmt_keyword = ModuleCommonHandler<ObjectFormatModule>
         (objfmt_keyword, "object format", "object formats", &listed, diags);
-    dbgfmt_keyword = ModuleCommonHandler<yasm::DebugFormatModule>
+    dbgfmt_keyword = ModuleCommonHandler<DebugFormatModule>
         (dbgfmt_keyword, "debug format", "debug formats", &listed, diags);
-    listfmt_keyword = ModuleCommonHandler<yasm::ListFormatModule>
+    listfmt_keyword = ModuleCommonHandler<ListFormatModule>
         (listfmt_keyword, "list format", "list formats", &listed, diags);
     if (listed)
         return EXIT_SUCCESS;
@@ -904,13 +931,13 @@ main(int argc, char* argv[])
     // Check for machine help
     if (machine_name == "help")
     {
-        std::auto_ptr<yasm::ArchModule> arch_auto =
-            yasm::LoadModule<yasm::ArchModule>(arch_keyword);
+        std::auto_ptr<ArchModule> arch_auto =
+            LoadModule<ArchModule>(arch_keyword);
         llvm::outs() << "Available machines for architecture '"
                      << arch_keyword << "':\n";
-        yasm::ArchModule::MachineNames machines = arch_auto->getMachines();
+        ArchModule::MachineNames machines = arch_auto->getMachines();
 
-        for (yasm::ArchModule::MachineNames::const_iterator
+        for (ArchModule::MachineNames::const_iterator
              i=machines.begin(), end=machines.end(); i != end; ++i)
             PrintListKeywordDesc(i->second, i->first);
         return EXIT_SUCCESS;
@@ -920,7 +947,7 @@ main(int argc, char* argv[])
     // as we want to allow e.g. "yasm --license".
     if (in_filename.empty())
     {
-        diags.Report(yasm::diag::fatal_no_input_files);
+        diags.Report(diag::fatal_no_input_files);
         return EXIT_FAILURE;
     }
 

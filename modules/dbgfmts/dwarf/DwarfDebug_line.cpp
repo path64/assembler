@@ -31,7 +31,7 @@
 
 #include <algorithm>
 
-#include "llvm/System/Path.h"
+#include "llvm/Support/Path.h"
 #include "yasmx/Basic/Diagnostic.h"
 #include "yasmx/Basic/FileManager.h"
 #include "yasmx/Basic/SourceManager.h"
@@ -107,7 +107,7 @@ namespace {
 class MatchFileDir
 {
 public:
-    MatchFileDir(llvm::StringRef name, unsigned long dir)
+    MatchFileDir(StringRef name, unsigned long dir)
         : m_name(name), m_dir(dir)
     {}
 
@@ -119,13 +119,13 @@ public:
     }
 
 private:
-    llvm::StringRef m_name;
+    StringRef m_name;
     unsigned long m_dir;
 };
 } // anonymous namespace
 
 unsigned long
-DwarfDebug::AddDir(llvm::StringRef dirname)
+DwarfDebug::AddDir(StringRef dirname)
 {
     // Put the directory into the directory table (checking for duplicates)
     Dirs::iterator d =
@@ -166,11 +166,12 @@ DwarfDebug::AddFile(const FileEntry* file)
 }
 
 size_t
-DwarfDebug::AddFile(unsigned long filenum, llvm::StringRef pathname)
+DwarfDebug::AddFile(unsigned long filenum, StringRef pathname)
 {
-    llvm::sys::Path path(pathname);
-
-    unsigned long dir = AddDir(path.getDirname());
+    StringRef dirname = llvm::sys::path::parent_path(pathname);
+    if (dirname.empty())
+        dirname = ".";
+    unsigned long dir = AddDir(dirname);
 
     // Put the filename into the filename table
     assert(filenum != 0);
@@ -182,7 +183,7 @@ DwarfDebug::AddFile(unsigned long filenum, llvm::StringRef pathname)
 
     // Save in table
     m_filenames[filenum].pathname = pathname;
-    m_filenames[filenum].filename = path.getLast();
+    m_filenames[filenum].filename = llvm::sys::path::filename(pathname);
     m_filenames[filenum].dir = dir;
     m_filenames[filenum].time = 0;
     m_filenames[filenum].length = 0;
@@ -544,8 +545,7 @@ DwarfDebug::AppendSPP(BytecodeContainer& container)
     // directory list
     for (Dirs::const_iterator i=m_dirs.begin(), end=m_dirs.end(); i != end; ++i)
     {
-        bytes.Write(reinterpret_cast<const unsigned char*>(i->data()),
-                    i->length());
+        bytes.WriteString(*i);
         Write8(bytes, 0);
     }
     // finish with single 0 byte
@@ -561,8 +561,7 @@ DwarfDebug::AppendSPP(BytecodeContainer& container)
                 << static_cast<unsigned int>((i-m_filenames.begin())+1);
             continue;
         }
-        bytes.Write(reinterpret_cast<const unsigned char*>(i->filename.data()),
-                    i->filename.length());
+        bytes.WriteString(i->filename);
         Write8(bytes, 0);
 
         WriteULEB128(bytes, i->dir+1);  // dir
@@ -581,7 +580,7 @@ DwarfDebug::AppendSPP(BytecodeContainer& container)
 }
 
 void
-DwarfDebug::DirLoc(DirectiveInfo& info, Diagnostic& diags)
+DwarfDebug::DirLoc(DirectiveInfo& info, DiagnosticsEngine& diags)
 {
     NameValues::const_iterator nv = info.getNameValues().begin();
     NameValues::const_iterator end = info.getNameValues().end();
@@ -667,7 +666,7 @@ DwarfDebug::DirLoc(DirectiveInfo& info, Diagnostic& diags)
     bool in_is_stmt = false, in_isa = false, in_discriminator = false;
     while (nv != end)
     {
-        llvm::StringRef name = nv->getName();
+        StringRef name = nv->getName();
 
 restart:
         if (in_is_stmt)
@@ -751,7 +750,7 @@ restart:
         }
         else if (name.empty() && nv->isId())
         {
-            llvm::StringRef s = nv->getId();
+            StringRef s = nv->getId();
             if (s.equals_lower("is_stmt"))
                 in_is_stmt = true;
             else if (s.equals_lower("isa"))
@@ -806,7 +805,7 @@ restart:
 }
 
 void
-DwarfDebug::DirFile(DirectiveInfo& info, Diagnostic& diags)
+DwarfDebug::DirFile(DirectiveInfo& info, DiagnosticsEngine& diags)
 {
     NameValues& nvs = info.getNameValues();
     assert(!nvs.empty());

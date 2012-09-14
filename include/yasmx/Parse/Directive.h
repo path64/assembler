@@ -29,7 +29,7 @@
 /// POSSIBILITY OF SUCH DAMAGE.
 /// @endlicense
 ///
-#include "llvm/ADT/StringRef.h"
+#include "yasmx/Basic/LLVM.h"
 #include "yasmx/Basic/SourceLocation.h"
 #include "yasmx/Config/export.h"
 #include "yasmx/Config/functional.h"
@@ -41,7 +41,7 @@
 namespace yasm
 {
 
-class Diagnostic;
+class DiagnosticsEngine;
 class Object;
 
 /// Directive information.  Helper class for passing all information about
@@ -75,7 +75,8 @@ private:
 ///       handler) is free to modify it (specifically the name/values
 ///       portions).  The typical modification performed is to swap or
 ///       otherwise remove values without copying.
-typedef TR1::function<void (DirectiveInfo& info, Diagnostic& diags)> Directive;
+typedef TR1::function<void (DirectiveInfo& info,
+                            DiagnosticsEngine& diags)> Directive;
 
 /// Container to manage and call directive handlers.
 class YASM_LIB_EXPORT Directives
@@ -94,7 +95,7 @@ public:
     struct Init
     {
         const char* name;
-        void (T::*func) (DirectiveInfo& info, Diagnostic& diags);
+        void (T::*func) (DirectiveInfo& info, DiagnosticsEngine& diags);
         Flags flags;
     };
 
@@ -107,7 +108,7 @@ public:
     ///                     name (not including the []).
     /// @param handler      Directive function
     /// @param flags        Flags for pre-handler parameter checking.
-    void Add(llvm::StringRef name, Directive handler, Flags flags = ANY);
+    void Add(StringRef name, Directive handler, Flags flags = ANY);
 
     /// Add directives from an initializer array.
     /// @param me           this pointer to associate
@@ -127,7 +128,7 @@ public:
     /// @param name         directive name
     /// @return True if directive exists, and handler is set to the
     ///         matching handler.
-    bool get(Directive* handler, llvm::StringRef name) const;
+    bool get(Directive* handler, StringRef name) const;
 
 private:
     /// Pimpl for class internals.

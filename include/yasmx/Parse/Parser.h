@@ -35,6 +35,7 @@
 #include <vector>
 
 #include "llvm/ADT/StringRef.h"
+#include "yasmx/Basic/LLVM.h"
 #include "yasmx/Config/export.h"
 
 #include "yasmx/Module.h"
@@ -43,7 +44,7 @@
 namespace yasm
 {
 
-class Diagnostic;
+class DiagnosticsEngine;
 class Directives;
 class HeaderSearch;
 class Linemap;
@@ -66,7 +67,7 @@ public:
     const ParserModule& getModule() const { return m_module; }
 
     /// Add directive handlers.
-    virtual void AddDirectives(Directives& dirs, llvm::StringRef parser);
+    virtual void AddDirectives(Directives& dirs, StringRef parser);
 
     virtual Preprocessor& getPreprocessor() const = 0;
 
@@ -76,7 +77,9 @@ public:
     /// @param dirs         available directives
     /// @param diags        diagnostic reporter
     /// @note Parse errors and warnings are stored into errwarns.
-    virtual void Parse(Object& object, Directives& dirs, Diagnostic& diags) = 0;
+    virtual void Parse(Object& object,
+                       Directives& dirs,
+                       DiagnosticsEngine& diags) = 0;
 
 private:
     Parser(const Parser&);                  // not implemented
@@ -96,14 +99,14 @@ public:
 
     /// Get the module type.
     /// @return "Parser".
-    llvm::StringRef getType() const;
+    StringRef getType() const;
 
     /// Parser factory function.
     /// @param diags        diagnostic reporting
     /// @param sm           source manager
     /// @return New parser.
     /// @note It is assumed sm is already loaded with a main file.
-    virtual std::auto_ptr<Parser> Create(Diagnostic& diags,
+    virtual std::auto_ptr<Parser> Create(DiagnosticsEngine& diags,
                                          SourceManager& sm,
                                          HeaderSearch& headers) const = 0;
 };
@@ -115,10 +118,10 @@ public:
     ParserModuleImpl() {}
     ~ParserModuleImpl() {}
 
-    llvm::StringRef getName() const { return ParserImpl::getName(); }
-    llvm::StringRef getKeyword() const { return ParserImpl::getKeyword(); }
+    StringRef getName() const { return ParserImpl::getName(); }
+    StringRef getKeyword() const { return ParserImpl::getKeyword(); }
 
-    std::auto_ptr<Parser> Create(Diagnostic& diags,
+    std::auto_ptr<Parser> Create(DiagnosticsEngine& diags,
                                  SourceManager& sm,
                                  HeaderSearch& headers) const
     {

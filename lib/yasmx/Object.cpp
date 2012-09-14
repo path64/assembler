@@ -28,10 +28,9 @@
 
 #include "yasmx/Object.h"
 
-#include <algorithm>
 #include <memory>
 
-#include <boost/pool/pool.hpp>
+#include <boost/pool/object_pool.hpp>
 
 #include "llvm/ADT/Statistic.h"
 #include "llvm/ADT/StringMap.h"
@@ -57,7 +56,7 @@ namespace {
 class SymGetName
 {
 public:
-    llvm::StringRef operator() (const Symbol* sym) const
+    StringRef operator() (const Symbol* sym) const
     { return sym->getName(); }
 };
 } // anonymous namespace
@@ -69,27 +68,20 @@ public:
     Impl(bool nocase)
         : sym_map(nocase)
         , special_sym_map(true)
-        , m_sym_pool(sizeof(Symbol))
     {}
     ~Impl() {}
 
-    Symbol* NewSymbol(llvm::StringRef name)
+    Symbol* NewSymbol(StringRef name)
     {
-        Symbol* sym = static_cast<Symbol*>(m_sym_pool.malloc());
-        new (sym) Symbol(name);
-        return sym;
+        return m_sym_pool.construct(name);
     }
 
     void DeleteSymbol(Symbol* sym)
     {
-        if (sym)
-        {
-            sym->~Symbol();
-            m_sym_pool.free(sym);
-        }
+        m_sym_pool.destroy(sym);
     }
 
-    typedef hamt<llvm::StringRef, Symbol, SymGetName> SymbolTable;
+    typedef hamt<StringRef, Symbol, SymGetName> SymbolTable;
 
     /// Symbol table symbols, indexed by name.
     SymbolTable sym_map;
@@ -102,13 +94,11 @@ public:
 
 private:
     /// Pool for symbols not in the symbol table.
-    boost::pool<> m_sym_pool;
+    boost::object_pool<Symbol> m_sym_pool;
 };
 } // namespace yasm
 
-Object::Object(llvm::StringRef src_filename,
-               llvm::StringRef obj_filename,
-               Arch* arch)
+Object::Object(StringRef src_filename, StringRef obj_filename, Arch* arch)
     : m_src_filename(src_filename),
       m_arch(arch),
       m_cur_section(0),
@@ -123,13 +113,13 @@ Object::Object(llvm::StringRef src_filename,
 }
 
 void
-Object::setSourceFilename(llvm::StringRef src_filename)
+Object::setSourceFilename(StringRef src_filename)
 {
     m_src_filename = src_filename;
 }
 
 void
-Object::setObjectFilename(llvm::StringRef obj_filename)
+Object::setObjectFilename(StringRef obj_filename)
 {
     m_obj_filename = obj_filename;
 }
@@ -139,10 +129,11 @@ Object::~Object()
 }
 
 void
-Object::Finalize(Diagnostic& diags)
+Object::Finalize(DiagnosticsEngine& diags)
 {
-    std::for_each(m_sections.begin(), m_sections.end(),
-                  TR1::bind(&Section::Finalize, _1, TR1::ref(diags)));
+    for (section_iterator i=m_sections.begin(), end=m_sections.end();
+         i != end; ++i)
+        i->Finalize(diags);
 }
 
 void
@@ -154,7 +145,7 @@ Object::AppendSection(std::auto_ptr<Section> sect)
 }
 
 Section*
-Object::FindSection(llvm::StringRef name)
+Object::FindSection(StringRef name)
 {
     return m_impl->section_map[name];
 }
@@ -175,13 +166,13 @@ Object::getAbsoluteSymbol()
 }
 
 SymbolRef
-Object::FindSymbol(llvm::StringRef name)
+Object::FindSymbol(StringRef name)
 {
     return SymbolRef(m_impl->sym_map.Find(name));
 }
 
 SymbolRef
-Object::getSymbol(llvm::StringRef name)
+Object::getSymbol(StringRef name)
 {
     // Don't use pool allocator for symbols in the symbol table.
     // We have to maintain an ordered link list of all symbols in the symbol
@@ -212,7 +203,7 @@ Object::getSymbol(Location loc)
 }
 
 SymbolRef
-Object::AppendSymbol(llvm::StringRef name)
+Object::AppendSymbol(StringRef name)
 {
     Symbol* sym = new Symbol(name);
     m_symbols.push_back(sym);
@@ -220,14 +211,14 @@ Object::AppendSymbol(llvm::StringRef name)
 }
 
 SymbolRef
-Object::AddNonTableSymbol(llvm::StringRef name)
+Object::AddNonTableSymbol(StringRef name)
 {
     Symbol* sym = m_impl->NewSymbol(name);
     return SymbolRef(sym);
 }
 
 void
-Object::RenameSymbol(SymbolRef sym, llvm::StringRef name)
+Object::RenameSymbol(SymbolRef sym, StringRef name)
 {
     m_impl->sym_map.Remove(sym->getName());
     sym->m_name = name;
@@ -245,7 +236,7 @@ Object::ExternUndefinedSymbols()
 }
 
 void
-Object::FinalizeSymbols(Diagnostic& diags)
+Object::FinalizeSymbols(DiagnosticsEngine& diags)
 {
     bool firstundef = true;
 
@@ -268,7 +259,7 @@ Object::FinalizeSymbols(Diagnostic& diags)
 }
 
 SymbolRef
-Object::AddSpecialSymbol(llvm::StringRef name)
+Object::AddSpecialSymbol(StringRef name)
 {
     Symbol* sym = m_impl->NewSymbol(name);
     m_impl->special_sym_map.Insert(sym);
@@ -276,7 +267,7 @@ Object::AddSpecialSymbol(llvm::StringRef name)
 }
 
 SymbolRef
-Object::FindSpecialSymbol(llvm::StringRef name)
+Object::FindSpecialSymbol(StringRef name)
 {
     return SymbolRef(m_impl->special_sym_map.Find(name));
 }
@@ -310,7 +301,7 @@ Object::Write(pugi::xml_node out) const
 #endif // WITH_XML
 
 void
-Object::UpdateBytecodeOffsets(Diagnostic& diags)
+Object::UpdateBytecodeOffsets(DiagnosticsEngine& diags)
 {
     for (section_iterator sect=m_sections.begin(), end=m_sections.end();
          sect != end; ++sect)
@@ -318,7 +309,7 @@ Object::UpdateBytecodeOffsets(Diagnostic& diags)
 }
 
 void
-Object::Optimize(Diagnostic& diags)
+Object::Optimize(DiagnosticsEngine& diags)
 {
     Optimizer opt(diags);
     unsigned long bc_index = 0;

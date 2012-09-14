@@ -31,12 +31,13 @@
 ///
 #include <vector>
 
+#include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/StringRef.h"
+#include "yasmx/Basic/LLVM.h"
 #include "yasmx/Config/export.h"
 #include "yasmx/Support/EndianState.h"
 #include "yasmx/DebugDumper.h"
 
-
-namespace llvm { class raw_ostream; }
 
 namespace yasm
 {
@@ -89,8 +90,11 @@ public:
 
     /// Copy from a byte array, appending the values to the end.
     /// @param  buf input buffer
-    /// @param  n   number of bytes
-    void Write(const unsigned char* buf, size_type n);
+    void Write(ArrayRef<unsigned char> buf);
+
+    /// Copy from a string (as bytes), appending the values to the end.
+    /// @param  buf input string
+    void WriteString(StringRef buf);
 
     /// Append n bytes of value v.
     /// @param  n   number of bytes
@@ -106,9 +110,15 @@ public:
 };
 
 inline void
-Bytes::Write(const unsigned char* buf, size_type n)
+Bytes::Write(ArrayRef<unsigned char> buf)
 {
-    insert(end(), buf, buf+n);
+    insert(end(), buf.begin(), buf.end());
+}
+
+inline void
+Bytes::WriteString(StringRef buf)
+{
+    insert(end(), buf.begin(), buf.end());
 }
 
 /// Output the entire contents of a bytes container to an output stream.
@@ -116,7 +126,7 @@ Bytes::Write(const unsigned char* buf, size_type n)
 /// @param bytes bytes
 /// @return Output stream
 YASM_LIB_EXPORT
-llvm::raw_ostream& operator<< (llvm::raw_ostream& os, const Bytes& bytes);
+raw_ostream& operator<< (raw_ostream& os, const Bytes& bytes);
 
 /// Specialized swap for algorithms.
 inline void

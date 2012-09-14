@@ -61,11 +61,11 @@ public:
            SourceLocation target_source);
     ~X86Jmp();
 
-    bool Finalize(Bytecode& bc, Diagnostic& diags);
+    bool Finalize(Bytecode& bc, DiagnosticsEngine& diags);
     bool CalcLen(Bytecode& bc,
                  /*@out@*/ unsigned long* len,
                  const Bytecode::AddSpanFunc& add_span,
-                 Diagnostic& diags);
+                 DiagnosticsEngine& diags);
     bool Expand(Bytecode& bc,
                 unsigned long* len,
                 int span,
@@ -74,10 +74,10 @@ public:
                 bool* keep,
                 /*@out@*/ long* neg_thres,
                 /*@out@*/ long* pos_thres,
-                Diagnostic& diags);
+                DiagnosticsEngine& diags);
     bool Output(Bytecode& bc, BytecodeOutput& bc_out);
 
-    llvm::StringRef getType() const;
+    StringRef getType() const;
 
     X86Jmp* clone() const;
 
@@ -120,7 +120,7 @@ X86Jmp::~X86Jmp()
 }
 
 bool
-X86Jmp::Finalize(Bytecode& bc, Diagnostic& diags)
+X86Jmp::Finalize(Bytecode& bc, DiagnosticsEngine& diags)
 {
     if (!m_target.Finalize(diags, diag::err_too_complex_jump))
         return false;
@@ -164,7 +164,7 @@ bool
 X86Jmp::CalcLen(Bytecode& bc,
                 /*@out@*/ unsigned long* len,
                 const Bytecode::AddSpanFunc& add_span,
-                Diagnostic& diags)
+                DiagnosticsEngine& diags)
 {
     unsigned long ilen = m_common.getLen();
 
@@ -192,7 +192,7 @@ X86Jmp::Expand(Bytecode& bc,
                bool* keep,
                /*@out@*/ long* neg_thres,
                /*@out@*/ long* pos_thres,
-               Diagnostic& diags)
+               DiagnosticsEngine& diags)
 {
     assert(span == 1 && "unrecognized span id");
     assert(m_op_sel != X86_JMP_NEAR && "trying to expand an already-near jump");
@@ -256,7 +256,7 @@ X86Jmp::Output(Bytecode& bc, BytecodeOutput& bc_out)
     return true;
 }
 
-llvm::StringRef
+StringRef
 X86Jmp::getType() const
 {
     return "yasm::arch::X86Jmp";

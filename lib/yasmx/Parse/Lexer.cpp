@@ -67,7 +67,7 @@ Lexer::InitLexer(const char* start, const char* ptr, const char* end)
 }
 
 Lexer::Lexer(FileID fid,
-             const llvm::MemoryBuffer* input_file,
+             const MemoryBuffer* input_file,
              Preprocessor& pp)
     : m_preproc(&pp)
     , m_fid(fid)
@@ -90,7 +90,7 @@ Lexer::Lexer(SourceLocation file_loc,
 }
 
 Lexer::Lexer(FileID fid,
-             const llvm::MemoryBuffer* from_file,
+             const MemoryBuffer* from_file,
              const SourceManager& sm)
   : m_file_loc(sm.getLocForStartOfFile(fid))
 {
@@ -143,7 +143,7 @@ Lexer::getSourceLocation(const char* loc, unsigned int tok_len) const
     // the file id from FileLoc with the offset specified.
     unsigned char_no = loc-m_buf_start;
     assert(m_file_loc.isFileID() && "Must be lexing from a file");
-    return m_file_loc.getFileLocWithOffset(char_no);
+    return m_file_loc.getLocWithOffset(char_no);
 }
 
 DiagnosticBuilder

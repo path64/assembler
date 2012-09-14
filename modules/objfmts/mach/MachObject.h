@@ -33,7 +33,7 @@
 
 namespace yasm
 {
-class Diagnostic;
+class DiagnosticsEngine;
 class DirectiveInfo;
 
 namespace objfmt
@@ -52,58 +52,59 @@ public:
     /// Destructor.
     ~MachObject();
 
-    void AddDirectives(Directives& dirs, llvm::StringRef parser);
+    void AddDirectives(Directives& dirs, StringRef parser);
 
-    void InitSymbols(llvm::StringRef parser);
+    void InitSymbols(StringRef parser);
 
-    void Output(llvm::raw_fd_ostream& os,
+    void Output(raw_fd_ostream& os,
                 bool all_syms,
                 DebugFormat& dbgfmt,
-                Diagnostic& diags);
+                DiagnosticsEngine& diags);
 
     Section* AddDefaultSection();
     Section* AppendSection(const SectionConfig& config,
                            SourceLocation source,
-                           Diagnostic& diags);
-    Section* AppendSection(llvm::StringRef name,
+                           DiagnosticsEngine& diags);
+    Section* AppendSection(StringRef name,
                            SourceLocation source,
-                           Diagnostic& diags);
-    Section* AppendSection(llvm::StringRef segname,
-                           llvm::StringRef sectname,
+                           DiagnosticsEngine& diags);
+    Section* AppendSection(StringRef segname,
+                           StringRef sectname,
                            SourceLocation source,
-                           Diagnostic& diags);
+                           DiagnosticsEngine& diags);
 
-    static llvm::StringRef getName() { return "Mac OS X ABI Mach-O"; }
-    static llvm::StringRef getKeyword() { return "macho"; }
-    static llvm::StringRef getExtension() { return ".o"; }
+    static StringRef getName() { return "Mac OS X ABI Mach-O"; }
+    static StringRef getKeyword() { return "macho"; }
+    static StringRef getExtension() { return ".o"; }
     static unsigned int getDefaultX86ModeBits() { return 0; }
-    static llvm::StringRef getDefaultDebugFormatKeyword() { return "cfi"; }
-    static std::vector<llvm::StringRef> getDebugFormatKeywords();
+    static StringRef getDefaultDebugFormatKeyword() { return "cfi"; }
+    static std::vector<StringRef> getDebugFormatKeywords();
     static bool isOkObject(Object& object) { return true; }
-    static bool Taste(const llvm::MemoryBuffer& in,
+    static bool Taste(const MemoryBuffer& in,
                       /*@out@*/ std::string* arch_keyword,
                       /*@out@*/ std::string* machine)
     { return false; }
 
 private:
     void InitSection(const SectionConfig& config, Section& section);
-    SectionConfig LookupSection(llvm::StringRef name);
-    SectionConfig LookupSection(llvm::StringRef segname, llvm::StringRef sectname);
-    void DirGasSection(DirectiveInfo& info, Diagnostic& diags);
-    void DirSection(DirectiveInfo& info, Diagnostic& diags);
+    SectionConfig LookupSection(StringRef name);
+    SectionConfig LookupSection(StringRef segname, StringRef sectname);
+    void DirGasSection(DirectiveInfo& info, DiagnosticsEngine& diags);
+    void DirSection(DirectiveInfo& info, DiagnosticsEngine& diags);
     void DirGasStandardSection(const StaticSectionConfig* config,
                                DirectiveInfo& info,
-                               Diagnostic& diags);
-    void DirZerofill(DirectiveInfo& info, Diagnostic& diags);
-    void DirIndirectSymbol(DirectiveInfo& info, Diagnostic& diags);
-    void DirReference(DirectiveInfo& info, Diagnostic& diags);
-    void DirLazyReference(DirectiveInfo& info, Diagnostic& diags);
-    void DirWeakReference(DirectiveInfo& info, Diagnostic& diags);
-    void DirWeakDefinition(DirectiveInfo& info, Diagnostic& diags);
-    void DirPrivateExtern(DirectiveInfo& info, Diagnostic& diags);
-    void DirDesc(DirectiveInfo& info, Diagnostic& diags);
-    void DirNoDeadStrip(DirectiveInfo& info, Diagnostic& diags);
-    void DirSubsectionsViaSymbols(DirectiveInfo& info, Diagnostic& diags);
+                               DiagnosticsEngine& diags);
+    void DirZerofill(DirectiveInfo& info, DiagnosticsEngine& diags);
+    void DirIndirectSymbol(DirectiveInfo& info, DiagnosticsEngine& diags);
+    void DirReference(DirectiveInfo& info, DiagnosticsEngine& diags);
+    void DirLazyReference(DirectiveInfo& info, DiagnosticsEngine& diags);
+    void DirWeakReference(DirectiveInfo& info, DiagnosticsEngine& diags);
+    void DirWeakDefinition(DirectiveInfo& info, DiagnosticsEngine& diags);
+    void DirPrivateExtern(DirectiveInfo& info, DiagnosticsEngine& diags);
+    void DirDesc(DirectiveInfo& info, DiagnosticsEngine& diags);
+    void DirNoDeadStrip(DirectiveInfo& info, DiagnosticsEngine& diags);
+    void DirSubsectionsViaSymbols(DirectiveInfo& info,
+                                  DiagnosticsEngine& diags);
 
     unsigned int m_bits;
     bool m_subsections_via_symbols;
@@ -119,18 +120,18 @@ public:
     {}
     ~Mach32Object();
 
-    static llvm::StringRef getName() { return "Mac OS X ABI Mach-O (32-bit)"; }
-    static llvm::StringRef getKeyword() { return "macho32"; }
-    static llvm::StringRef getExtension() { return MachObject::getExtension(); }
+    static StringRef getName() { return "Mac OS X ABI Mach-O (32-bit)"; }
+    static StringRef getKeyword() { return "macho32"; }
+    static StringRef getExtension() { return MachObject::getExtension(); }
     static unsigned int getDefaultX86ModeBits() { return 32; }
 
-    static llvm::StringRef getDefaultDebugFormatKeyword()
+    static StringRef getDefaultDebugFormatKeyword()
     { return MachObject::getDefaultDebugFormatKeyword(); }
-    static std::vector<llvm::StringRef> getDebugFormatKeywords()
+    static std::vector<StringRef> getDebugFormatKeywords()
     { return MachObject::getDebugFormatKeywords(); }
 
     static bool isOkObject(Object& object);
-    static bool Taste(const llvm::MemoryBuffer& in,
+    static bool Taste(const MemoryBuffer& in,
                       /*@out@*/ std::string* arch_keyword,
                       /*@out@*/ std::string* machine)
     { return false; }
@@ -144,18 +145,18 @@ public:
     {}
     ~Mach64Object();
 
-    static llvm::StringRef getName() { return "Mac OS X ABI Mach-O (64-bit)"; }
-    static llvm::StringRef getKeyword() { return "macho64"; }
-    static llvm::StringRef getExtension() { return MachObject::getExtension(); }
+    static StringRef getName() { return "Mac OS X ABI Mach-O (64-bit)"; }
+    static StringRef getKeyword() { return "macho64"; }
+    static StringRef getExtension() { return MachObject::getExtension(); }
     static unsigned int getDefaultX86ModeBits() { return 64; }
 
-    static llvm::StringRef getDefaultDebugFormatKeyword()
+    static StringRef getDefaultDebugFormatKeyword()
     { return MachObject::getDefaultDebugFormatKeyword(); }
-    static std::vector<llvm::StringRef> getDebugFormatKeywords()
+    static std::vector<StringRef> getDebugFormatKeywords()
     { return MachObject::getDebugFormatKeywords(); }
 
     static bool isOkObject(Object& object);
-    static bool Taste(const llvm::MemoryBuffer& in,
+    static bool Taste(const MemoryBuffer& in,
                       /*@out@*/ std::string* arch_keyword,
                       /*@out@*/ std::string* machine)
     { return false; }

@@ -13,11 +13,14 @@
 
 #include "llvm/ADT/StringMap.h"
 #include "llvm/ADT/StringExtras.h"
+#include "llvm/Support/Compiler.h"
 #include <cassert>
 using namespace llvm;
 
-StringMapImpl::StringMapImpl(unsigned InitSize, unsigned itemSize) {
+StringMapImpl::StringMapImpl(unsigned InitSize, unsigned itemSize,
+                             bool caseSensitiveOnly) {
   ItemSize = itemSize;
+  CaseSensitiveOnly = caseSensitiveOnly;
   
   // If a size is specified, initialize the table with that many buckets.
   if (InitSize) {
@@ -39,11 +42,13 @@ void StringMapImpl::init(unsigned InitSize) {
   NumItems = 0;
   NumTombstones = 0;
   
-  TheTable = (ItemBucket*)calloc(NumBuckets+1, sizeof(ItemBucket));
-  
+  TheTable = (StringMapEntryBase **)calloc(NumBuckets+1,
+                                           sizeof(StringMapEntryBase **) +
+                                           sizeof(unsigned));
+
   // Allocate one extra bucket, set it to look filled so the iterators stop at
   // end.
-  TheTable[NumBuckets].Item = (StringMapEntryBase*)2;
+  TheTable[NumBuckets] = (StringMapEntryBase*)2;
 }
 
 
@@ -58,31 +63,31 @@ unsigned StringMapImpl::LookupBucketFor(StringRef Name) {
     init(16);
     HTSize = NumBuckets;
   }
-  unsigned FullHashValue = HashString(Name);
+  unsigned FullHashValue = CaseSensitiveOnly?HashString(Name):HashStringCI(Name);
   unsigned BucketNo = FullHashValue & (HTSize-1);
-  
+  unsigned *HashTable = (unsigned *)(TheTable + NumBuckets + 1);
+
   unsigned ProbeAmt = 1;
   int FirstTombstone = -1;
   while (1) {
-    ItemBucket &Bucket = TheTable[BucketNo];
-    StringMapEntryBase *BucketItem = Bucket.Item;
+    StringMapEntryBase *BucketItem = TheTable[BucketNo];
     // If we found an empty bucket, this key isn't in the table yet, return it.
-    if (BucketItem == 0) {
+    if (LLVM_LIKELY(BucketItem == 0)) {
       // If we found a tombstone, we want to reuse the tombstone instead of an
       // empty bucket.  This reduces probing.
       if (FirstTombstone != -1) {
-        TheTable[FirstTombstone].FullHashValue = FullHashValue;
+        HashTable[FirstTombstone] = FullHashValue;
         return FirstTombstone;
       }
       
-      Bucket.FullHashValue = FullHashValue;
+      HashTable[BucketNo] = FullHashValue;
       return BucketNo;
     }
     
     if (BucketItem == getTombstoneVal()) {
       // Skip over tombstones.  However, remember the first one we see.
       if (FirstTombstone == -1) FirstTombstone = BucketNo;
-    } else if (Bucket.FullHashValue == FullHashValue) {
+    } else if (LLVM_LIKELY(HashTable[BucketNo] == FullHashValue)) {
       // If the full hash value matches, check deeply for a match.  The common
       // case here is that we are only looking at the buckets (for item info
       // being non-null and for the full hash value) not at the items.  This
@@ -91,7 +96,9 @@ unsigned StringMapImpl::LookupBucketFor(StringRef Name) {
       // Do the comparison like this because Name isn't necessarily
       // null-terminated!
       char *ItemStr = (char*)BucketItem+ItemSize;
-      if (Name == StringRef(ItemStr, BucketItem->getKeyLength())) {
+      if ((!CaseSensitiveOnly && !BucketItem->isCaseSensitive() &&
+           Name.equals_lower(StringRef(ItemStr, BucketItem->getKeyLength()))) ||
+          Name == StringRef(ItemStr, BucketItem->getKeyLength())) {
         // We found a match!
         return BucketNo;
       }
@@ -113,20 +120,20 @@ unsigned StringMapImpl::LookupBucketFor(StringRef Name) {
 int StringMapImpl::FindKey(StringRef Key) const {
   unsigned HTSize = NumBuckets;
   if (HTSize == 0) return -1;  // Really empty table?
-  unsigned FullHashValue = HashString(Key);
+  unsigned FullHashValue = CaseSensitiveOnly?HashString(Key):HashStringCI(Key);
   unsigned BucketNo = FullHashValue & (HTSize-1);
-  
+  unsigned *HashTable = (unsigned *)(TheTable + NumBuckets + 1);
+
   unsigned ProbeAmt = 1;
   while (1) {
-    ItemBucket &Bucket = TheTable[BucketNo];
-    StringMapEntryBase *BucketItem = Bucket.Item;
+    StringMapEntryBase *BucketItem = TheTable[BucketNo];
     // If we found an empty bucket, this key isn't in the table yet, return.
-    if (BucketItem == 0)
+    if (LLVM_LIKELY(BucketItem == 0))
       return -1;
     
     if (BucketItem == getTombstoneVal()) {
       // Ignore tombstones.
-    } else if (Bucket.FullHashValue == FullHashValue) {
+    } else if (LLVM_LIKELY(HashTable[BucketNo] == FullHashValue)) {
       // If the full hash value matches, check deeply for a match.  The common
       // case here is that we are only looking at the buckets (for item info
       // being non-null and for the full hash value) not at the items.  This
@@ -135,7 +142,9 @@ int StringMapImpl::FindKey(StringRef Key) const {
       // Do the comparison like this because NameStart isn't necessarily
       // null-terminated!
       char *ItemStr = (char*)BucketItem+ItemSize;
-      if (Key == StringRef(ItemStr, BucketItem->getKeyLength())) {
+      if ((!CaseSensitiveOnly && !BucketItem->isCaseSensitive() &&
+           Key.equals_lower(StringRef(ItemStr, BucketItem->getKeyLength()))) ||
+          Key == StringRef(ItemStr, BucketItem->getKeyLength())) {
         // We found a match!
         return BucketNo;
       }
@@ -155,7 +164,7 @@ int StringMapImpl::FindKey(StringRef Key) const {
 void StringMapImpl::RemoveKey(StringMapEntryBase *V) {
   const char *VStr = (char*)V + ItemSize;
   StringMapEntryBase *V2 = RemoveKey(StringRef(VStr, V->getKeyLength()));
-  V2 = V2;
+  (void)V2;
   assert(V == V2 && "Didn't find key?");
 }
 
@@ -165,10 +174,12 @@ StringMapEntryBase *StringMapImpl::RemoveKey(StringRef Key) {
   int Bucket = FindKey(Key);
   if (Bucket == -1) return 0;
   
-  StringMapEntryBase *Result = TheTable[Bucket].Item;
-  TheTable[Bucket].Item = getTombstoneVal();
+  StringMapEntryBase *Result = TheTable[Bucket];
+  TheTable[Bucket] = getTombstoneVal();
   --NumItems;
   ++NumTombstones;
+  assert(NumItems + NumTombstones <= NumBuckets);
+
   return Result;
 }
 
@@ -177,22 +188,39 @@ StringMapEntryBase *StringMapImpl::RemoveKey(StringRef Key) {
 /// RehashTable - Grow the table, redistributing values into the buckets with
 /// the appropriate mod-of-hashtable-size.
 void StringMapImpl::RehashTable() {
-  unsigned NewSize = NumBuckets*2;
+  unsigned NewSize;
+  unsigned *HashTable = (unsigned *)(TheTable + NumBuckets + 1);
+
+  // If the hash table is now more than 3/4 full, or if fewer than 1/8 of
+  // the buckets are empty (meaning that many are filled with tombstones),
+  // grow/rehash the table.
+  if (NumItems*4 > NumBuckets*3) {
+    NewSize = NumBuckets*2;
+  } else if (NumBuckets-(NumItems+NumTombstones) <= NumBuckets/8) {
+    NewSize = NumBuckets;
+  } else {
+    return;
+  }
+
   // Allocate one extra bucket which will always be non-empty.  This allows the
   // iterators to stop at end.
-  ItemBucket *NewTableArray =(ItemBucket*)calloc(NewSize+1, sizeof(ItemBucket));
-  NewTableArray[NewSize].Item = (StringMapEntryBase*)2;
-  
+  StringMapEntryBase **NewTableArray =
+    (StringMapEntryBase **)calloc(NewSize+1, sizeof(StringMapEntryBase *) +
+                                             sizeof(unsigned));
+  unsigned *NewHashArray = (unsigned *)(NewTableArray + NewSize + 1);
+  NewTableArray[NewSize] = (StringMapEntryBase*)2;
+
   // Rehash all the items into their new buckets.  Luckily :) we already have
   // the hash values available, so we don't have to rehash any strings.
-  for (ItemBucket *IB = TheTable, *E = TheTable+NumBuckets; IB != E; ++IB) {
-    if (IB->Item && IB->Item != getTombstoneVal()) {
+  for (unsigned I = 0, E = NumBuckets; I != E; ++I) {
+    StringMapEntryBase *Bucket = TheTable[I];
+    if (Bucket && Bucket != getTombstoneVal()) {
       // Fast case, bucket available.
-      unsigned FullHash = IB->FullHashValue;
+      unsigned FullHash = HashTable[I];
       unsigned NewBucket = FullHash & (NewSize-1);
-      if (NewTableArray[NewBucket].Item == 0) {
-        NewTableArray[FullHash & (NewSize-1)].Item = IB->Item;
-        NewTableArray[FullHash & (NewSize-1)].FullHashValue = FullHash;
+      if (NewTableArray[NewBucket] == 0) {
+        NewTableArray[FullHash & (NewSize-1)] = Bucket;
+        NewHashArray[FullHash & (NewSize-1)] = FullHash;
         continue;
       }
       
@@ -200,11 +228,11 @@ void StringMapImpl::RehashTable() {
       unsigned ProbeSize = 1;
       do {
         NewBucket = (NewBucket + ProbeSize++) & (NewSize-1);
-      } while (NewTableArray[NewBucket].Item);
+      } while (NewTableArray[NewBucket]);
       
       // Finally found a slot.  Fill it in.
-      NewTableArray[NewBucket].Item = IB->Item;
-      NewTableArray[NewBucket].FullHashValue = FullHash;
+      NewTableArray[NewBucket] = Bucket;
+      NewHashArray[NewBucket] = FullHash;
     }
   }
   
@@ -212,4 +240,5 @@ void StringMapImpl::RehashTable() {
   
   TheTable = NewTableArray;
   NumBuckets = NewSize;
+  NumTombstones = 0;
 }

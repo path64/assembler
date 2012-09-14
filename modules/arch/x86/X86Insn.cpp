@@ -148,7 +148,11 @@ enum X86OperandType
     // EAX memory operand only (EA) [special case for SVM skinit opcode]
     OPT_MemEAX = 26,
     // DX memory operand only (EA) [special case for in/out opcodes]
-    OPT_MemDX = 27
+    OPT_MemDX = 27,
+    // XMM VSIB memory operand
+    OPT_MemXMMIndex = 28,
+    // YMM VSIB memory operand
+    OPT_MemYMMIndex = 29
 };
 
 enum X86OperandSize
@@ -221,6 +225,51 @@ enum X86OperandPostAction
     // large imm64 that can become a sign-extended imm32
     OPAP_SImm32Avail = 4
 };
+
+class IsRegType
+{
+public:
+    IsRegType(X86Register::Type type) : m_type(type) {}
+    bool operator() (const ExprTerm& term) const
+    {
+        if (const Register* reg = term.getRegister())
+        {
+            const X86Register* x86reg = static_cast<const X86Register*>(reg);
+            if (x86reg->is(m_type))
+                return true;
+        }
+        return false;
+    }
+private:
+    X86Register::Type m_type;
+};
+
+template <typename Func>
+bool
+ContainsMatch(const Expr& e, const Func& match)
+{
+    const ExprTerms& terms = e.getTerms();
+    int pos = terms.size() - 1;
+
+    const ExprTerm& parent = terms[pos];
+    if (!parent.isOp())
+    {
+        if (match(parent))
+            return true;
+        return false;
+    }
+    for (int n=pos-1; n>=0; --n)
+    {
+        const ExprTerm& child = terms[n];
+        if (child.isEmpty())
+            continue;
+        if (child.m_depth <= parent.m_depth)
+            break;  // Stop when we're out of children
+        if (match(child))
+            return true;
+    }
+    return false;
+}
 } // anonymous namespace
 
 namespace yasm { namespace arch {
@@ -341,7 +390,7 @@ X86Prefix::~X86Prefix()
 }
 
 void
-X86Prefix::Put(llvm::raw_ostream& os) const
+X86Prefix::Put(raw_ostream& os) const
 {
     // TODO
     os << "PREFIX";
@@ -360,8 +409,9 @@ X86Prefix::Write(pugi::xml_node out) const
         case OPERSIZE:  type = "OPERSIZE"; break;
         case SEGREG:    type = "SEGREG"; break;
         case REX:       type = "REX"; break;
+        case ACQREL:    type = "ACQREL"; break;
     }
-    append_data(root, llvm::Twine::utohexstr(m_value).str());
+    append_data(root, Twine::utohexstr(m_value).str());
     return root;
 }
 #endif // WITH_XML
@@ -372,7 +422,7 @@ bool
 X86Insn::DoAppendJmpFar(BytecodeContainer& container,
                         const X86InsnInfo& info,
                         SourceLocation source,
-                        Diagnostic& diags)
+                        DiagnosticsEngine& diags)
 {
     Operand& op = m_operands.front();
     std::auto_ptr<Expr> imm = op.ReleaseImm();
@@ -491,7 +541,7 @@ bool
 X86Insn::DoAppendJmp(BytecodeContainer& container,
                      const X86InsnInfo& jinfo,
                      SourceLocation source,
-                     Diagnostic& diags)
+                     DiagnosticsEngine& diags)
 {
     static const unsigned char size_lookup[] =
         {0, 8, 16, 32, 64, 80, 128, 0, 0};  // 256 not needed
@@ -770,6 +820,20 @@ X86Insn::MatchOperand(const Operand& op, const X86InfoOperand& info_op,
                 return false;
             break;
         }
+        case OPT_MemXMMIndex:
+        {
+            if (!ea || !ContainsMatch(*ea->m_disp.getAbs(),
+                                      IsRegType(X86Register::XMMREG)))
+                return false;
+            break;
+        }
+        case OPT_MemYMMIndex:
+        {
+            if (!ea || !ContainsMatch(*ea->m_disp.getAbs(),
+                                      IsRegType(X86Register::YMMREG)))
+                return false;
+            break;
+        }
         default:
             assert(false && "invalid operand type");
     }
@@ -978,7 +1042,7 @@ X86Insn::FindMatch(const unsigned int* size_lookup, int bypass) const
 void
 X86Insn::MatchError(const unsigned int* size_lookup,
                     SourceLocation source,
-                    Diagnostic& diags) const
+                    DiagnosticsEngine& diags) const
 {
     const X86InsnInfo* i = m_group;
 
@@ -1046,7 +1110,7 @@ X86Insn::MatchError(const unsigned int* size_lookup,
 bool
 X86Insn::DoAppend(BytecodeContainer& container,
                   SourceLocation source,
-                  Diagnostic& diags)
+                  DiagnosticsEngine& diags)
 {
     unsigned int size_lookup[] = {0, 8, 16, 32, 64, 80, 128, 256, 0};
     size_lookup[OPS_BITS] = m_mode_bits;
@@ -1122,7 +1186,7 @@ public:
                  const unsigned int* size_lookup,
                  bool force_strict,
                  bool default_rel,
-                 Diagnostic& diags);
+                 DiagnosticsEngine& diags);
     ~BuildGeneral();
 
     void ApplyModifiers(unsigned char* mod_data);
@@ -1143,7 +1207,7 @@ private:
     const unsigned int* m_size_lookup;
     bool m_force_strict;
     bool m_default_rel;
-    Diagnostic& m_diags;
+    DiagnosticsEngine& m_diags;
 
     X86Opcode m_opcode;
     std::auto_ptr<X86EffAddr> m_x86_ea;
@@ -1169,7 +1233,7 @@ BuildGeneral::BuildGeneral(const X86InsnInfo& info,
                            const unsigned int* size_lookup,
                            bool force_strict,
                            bool default_rel,
-                           Diagnostic& diags)
+                           DiagnosticsEngine& diags)
     : m_info(info),
       m_mode_bits(mode_bits),
       m_size_lookup(size_lookup),
@@ -1335,6 +1399,18 @@ BuildGeneral::ApplyOperand(const X86InfoOperand& info_op, Operand& op)
                     if (info_op.type == OPT_MemOffs)
                         // Special-case for MOV MemOffs instruction
                         m_x86_ea->setDispOnly();
+                    else if (info_op.type == OPT_MemXMMIndex)
+                    {
+                        // Remember VSIB mode
+                        m_x86_ea->m_vsib_mode = 1;
+                        m_x86_ea->m_need_sib = 1;
+                    }
+                    else if (info_op.type == OPT_MemYMMIndex)
+                    {
+                        // Remember VSIB mode
+                        m_x86_ea->m_vsib_mode = 2;
+                        m_x86_ea->m_need_sib = 1;
+                    }
                     else if (m_default_rel &&
                              !m_x86_ea->m_not_pc_rel &&
                              (!segreg ||
@@ -1659,11 +1735,12 @@ BuildGeneral::Finish(BytecodeContainer& container,
         {
             // Look at the first byte of the opcode for the XOP mmmmm field.
             // Leave R=X=B=1 for now.
-            assert((m_opcode.get(0) == 0x08 || m_opcode.get(0) == 0x09) &&
-                   "first opcode byte of XOP must be 0x08 or 0x09");
+            unsigned char op0 = m_opcode.get(0);
+            assert((op0 == 0x08 || op0 == 0x09 || op0 == 0x0A) &&
+                   "first opcode byte of XOP must be 0x08, 0x09, or 0x0A");
             // Real opcode is in byte 1.
             opcode[2] = m_opcode.get(1);
-            opcode[0] |= m_opcode.get(0);
+            opcode[0] |= op0;
         }
         else
         {
@@ -1740,7 +1817,7 @@ X86Insn::DoAppendGeneral(BytecodeContainer& container,
                          const X86InsnInfo& info,
                          const unsigned int* size_lookup,
                          SourceLocation source,
-                         Diagnostic& diags)
+                         DiagnosticsEngine& diags)
 {
     BuildGeneral buildgen(info, m_mode_bits, size_lookup, m_force_strict,
                           m_default_rel, diags);
@@ -1870,9 +1947,9 @@ CpuFindReverse(unsigned int cpu0, unsigned int cpu1, unsigned int cpu2)
 }
 
 Arch::InsnPrefix
-X86Arch::ParseCheckInsnPrefix(llvm::StringRef id,
+X86Arch::ParseCheckInsnPrefix(StringRef id,
                               SourceLocation source,
-                              Diagnostic& diags) const
+                              DiagnosticsEngine& diags) const
 {
     size_t id_len = id.size();
     if (id_len > 16)
@@ -1992,9 +2069,8 @@ X86Insn::DoWrite(pugi::xml_node out) const
     append_child(root, "NumInfo", m_num_info);
     append_child(root, "ModeBits", m_mode_bits);
 
-    append_child(root, "SuffixFlags", llvm::Twine::utohexstr(m_suffix).str());
-    append_child(root, "MiscFlags",
-                 llvm::Twine::utohexstr(m_misc_flags).str());
+    append_child(root, "SuffixFlags", Twine::utohexstr(m_suffix).str());
+    append_child(root, "MiscFlags", Twine::utohexstr(m_misc_flags).str());
     append_child(root, "Parser", m_parser);
 
     if (m_force_strict)

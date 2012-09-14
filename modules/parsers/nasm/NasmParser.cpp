@@ -43,6 +43,8 @@
 #include "yasmx/Section.h"
 #include "yasmx/Symbol_util.h"
 
+#include "NasmLexer.h"
+
 #include "nasm.h"
 #include "nasmlib.h"
 #include "nasm-eval.h"
@@ -88,12 +90,101 @@ nasm_efunc(int severity, const char *fmt, ...)
 }
 
 NasmParser::NasmParser(const ParserModule& module,
-                       Diagnostic& diags,
+                       DiagnosticsEngine& diags,
                        SourceManager& sm,
                        HeaderSearch& headers)
-    : ParserImpl(module, m_nasm_preproc)
+    : Parser(module)
+    , ParserImpl(m_nasm_preproc)
     , m_nasm_preproc(diags, sm, headers)
 {
+    // pre-populate keywords
+    static const struct
+    {
+        const char* name;
+        NasmToken::Kind kind;
+    } nasm_kws_init[] =
+    {
+        {"abs",     NasmToken::kw_abs},
+        {"byte",    NasmToken::kw_byte},
+        {"dqword",  NasmToken::kw_dqword},
+        {"dword",   NasmToken::kw_dword},
+        {"hword",   NasmToken::kw_hword},
+        {"long",    NasmToken::kw_long},
+        {"nosplit", NasmToken::kw_nosplit},
+        {"oword",   NasmToken::kw_oword},
+        {"qword",   NasmToken::kw_qword},
+        {"rel",     NasmToken::kw_rel},
+        {"seg",     NasmToken::kw_seg},
+        {"strict",  NasmToken::kw_strict},
+        {"tword",   NasmToken::kw_tword},
+        {"word",    NasmToken::kw_word},
+        {"wrt",     NasmToken::kw_wrt},
+        {"yword",   NasmToken::kw_yword},
+    };
+
+    IdentifierTable& table = m_nasm_preproc.getIdentifierTable();
+    for (size_t i=0; i<sizeof(nasm_kws_init)/sizeof(nasm_kws_init[0]); ++i)
+    {
+        IdentifierInfo& ii = table.get(nasm_kws_init[i].name);
+        ii.setTokenKind(nasm_kws_init[i].kind);
+        ii.setCaseInsensitive();
+    }
+
+    // all possible pseudo-instructions (to avoid dynamic allocation)
+    static const PseudoInsn equ_insn = {PseudoInsn::EQU, 0};
+    static const PseudoInsn incbin_insn = {PseudoInsn::INCBIN, 0};
+    static const PseudoInsn times_insn = {PseudoInsn::TIMES, 0};
+
+    // pre-populate pseudo-instructions
+    static const struct
+    {
+        const char* name;
+        const PseudoInsn* insn;
+    } nasm_pseudo_fixed_init[] =
+    {
+        {"equ",     &equ_insn},
+        {"incbin",  &incbin_insn},
+        {"times",   &times_insn},
+    };
+    for (size_t i=0; i<sizeof(nasm_pseudo_fixed_init)/
+         sizeof(nasm_pseudo_fixed_init[0]); ++i)
+    {
+        IdentifierInfo& ii = table.get(nasm_pseudo_fixed_init[i].name);
+        ii.setCustom(nasm_pseudo_fixed_init[i].insn);
+        ii.setCaseInsensitive();
+    }
+
+    static const struct
+    {
+        const char* dname;
+        const char* resname;
+        unsigned int ndx;
+    } nasm_pseudo_ndx_init[] =
+    {
+        {"db",  "resb",     DB},
+        {"dt",  "rest",     DT},
+        {"dy",  "resy",     DY},
+        {"dhw", "reshw",    DHW},
+        {"dw",  "resw",     DW},
+        {"dd",  "resd",     DD},
+        {"dq",  "resq",     DQ},
+        {"do",  "reso",     DO},
+    };
+    for (size_t i=0; i<sizeof(nasm_pseudo_ndx_init)/
+         sizeof(nasm_pseudo_ndx_init[0]); ++i)
+    {
+        unsigned int ndx = nasm_pseudo_ndx_init[i].ndx;
+
+        m_data_insns[ndx].type = PseudoInsn::DECLARE_DATA;
+        IdentifierInfo& ii = table.get(nasm_pseudo_ndx_init[i].dname);
+        ii.setCustom(&m_data_insns[ndx]);
+        ii.setCaseInsensitive();
+
+        m_reserve_insns[ndx].type = PseudoInsn::RESERVE_SPACE;
+        IdentifierInfo& ii2 = table.get(nasm_pseudo_ndx_init[i].resname);
+        ii2.setCustom(&m_reserve_insns[ndx]);
+        ii2.setCaseInsensitive();
+    }
 }
 
 NasmParser::~NasmParser()
@@ -101,7 +192,7 @@ NasmParser::~NasmParser()
 }
 
 void
-NasmParser::Parse(Object& object, Directives& dirs, Diagnostic& diags)
+NasmParser::Parse(Object& object, Directives& dirs, DiagnosticsEngine& diags)
 {
     m_object = &object;
     m_dirs = &dirs;
@@ -109,11 +200,6 @@ NasmParser::Parse(Object& object, Directives& dirs, Diagnostic& diags)
     m_wordsize = m_arch->getModule().getWordSize();
 
     // Set up pseudo instructions.
-    for (int i=0; i<8; ++i)
-    {
-        m_data_insns[i].type = PseudoInsn::DECLARE_DATA;
-        m_reserve_insns[i].type = PseudoInsn::RESERVE_SPACE;
-    }
     m_data_insns[DB].size = m_reserve_insns[DB].size = 1;               // b
     m_data_insns[DT].size = m_reserve_insns[DT].size = 80/8;            // t
     m_data_insns[DY].size = m_reserve_insns[DY].size = 256/8;           // y
@@ -203,7 +289,7 @@ NasmParser::Parse(Object& object, Directives& dirs, Diagnostic& diags)
         int altline = nasm::nasm_src_get(&linnum, &file_name);
         if (altline != 0) {
             lineinc = (altline != -1 || lineinc != 1);
-            llvm::SmallString<64> linestr;
+            SmallString<64> linestr;
             llvm::raw_svector_ostream los(linestr);
             los << "%line " << linnum << '+' << lineinc << ' ' << file_name
                 << '\n';
@@ -235,7 +321,7 @@ NasmParser::Parse(Object& object, Directives& dirs, Diagnostic& diags)
         sm.getBuffer(sm.getMainFileID())->getBufferIdentifier();
     sm.clearIDTables();
     sm.createMainFileIDForMemBuffer(
-        llvm::MemoryBuffer::getMemBufferCopy(result, filename));
+        MemoryBuffer::getMemBufferCopy(result, filename));
 
     // Get first token
     m_preproc.EnterMainSourceFile();
@@ -247,7 +333,7 @@ NasmParser::Parse(Object& object, Directives& dirs, Diagnostic& diags)
 }
 
 void
-NasmParser::AddDirectives(Directives& dirs, llvm::StringRef parser)
+NasmParser::AddDirectives(Directives& dirs, StringRef parser)
 {
     static const Directives::Init<NasmParser> nasm_dirs[] =
     {
@@ -262,6 +348,12 @@ NasmParser::AddDirectives(Directives& dirs, llvm::StringRef parser)
         dirs.Add("global", &DirGlobal, Directives::ID_REQUIRED);
         dirs.Add("common", &DirCommon, Directives::ID_REQUIRED);
     }
+}
+
+Preprocessor&
+NasmParser::getPreprocessor() const
+{
+    return ParserImpl::getPreprocessor();
 }
 
 void

@@ -34,7 +34,7 @@
 #include <string>
 
 #include "llvm/ADT/APInt.h"
-#include "llvm/ADT/StringRef.h"
+#include "yasmx/Basic/LLVM.h"
 #include "yasmx/Basic/SourceLocation.h"
 #include "yasmx/Config/export.h"
 #include "yasmx/Config/longlong.h"
@@ -44,7 +44,7 @@
 
 namespace yasm
 {
-class Diagnostic;
+class DiagnosticsEngine;
 
 /// Check to see if APInt will fit without overflow into size bits.
 /// @param intn         APInt
@@ -85,7 +85,7 @@ struct YASM_LIB_EXPORT IntNumData
 class YASM_LIB_EXPORT IntNum : private IntNumData
 {
     friend YASM_LIB_EXPORT
-    llvm::raw_ostream& operator<< (llvm::raw_ostream& os, const IntNum& intn);
+    raw_ostream& operator<< (raw_ostream& os, const IntNum& intn);
     friend YASM_LIB_EXPORT
     int Compare(const IntNum& intn1, const IntNum& intn2);
     friend YASM_LIB_EXPORT
@@ -228,9 +228,9 @@ public:
     bool Calc(Op::Op op,
               const IntNum& operand,
               SourceLocation source,
-              Diagnostic& diags)
+              DiagnosticsEngine& diags)
     { return CalcImpl(op, &operand, source, &diags); }
-    bool Calc(Op::Op op, SourceLocation source, Diagnostic& diags)
+    bool Calc(Op::Op op, SourceLocation source, DiagnosticsEngine& diags)
     { return CalcImpl(op, 0, source, &diags); }
 
     /// Integer calculation function: acc = acc op operand.
@@ -317,14 +317,14 @@ public:
     /// @param str      input string
     /// @param radix    numeric base (10=decimal, etc)
     /// @return False if overflow occurred.
-    bool setStr(llvm::StringRef str, unsigned int radix=10);
+    bool setStr(StringRef str, unsigned int radix=10);
 
     /// Get intnum value into a SmallString.  The returned string will
     /// contain a leading '-' if the intnum is negative.
     /// @param str          output SmallString
     /// @param base         numeric base (10=decimal, etc)
     /// @param lowercase    whether hex digits should be lowercase
-    void getStr(llvm::SmallVectorImpl<char>& str,
+    void getStr(SmallVectorImpl<char>& str,
                 int base = 10,
                 bool lowercase = true) const;
  
@@ -397,7 +397,7 @@ public:
     /// @param bits         number of bits to pad output to (-1 for no padding);
     ///                     applys only to non-decimal output
     /// The negative sign (if required) is output before the non-decimal prefix.
-    void Print(llvm::raw_ostream& os,
+    void Print(raw_ostream& os,
                int base = 10,
                bool lowercase = true,
                bool showbase = true,
@@ -415,7 +415,7 @@ private:
     bool CalcImpl(Op::Op op,
                   /*@null@*/ const IntNum* operand,
                   SourceLocation source,
-                  Diagnostic* diags);
+                  DiagnosticsEngine* diags);
 
     /// Set an intnum to an unsigned integer.
     /// @param val      integer value
@@ -518,8 +518,8 @@ swap(IntNum& left, IntNum& right)
     left.swap(right);
 }
 
-inline llvm::raw_ostream&
-operator<< (llvm::raw_ostream& os, const IntNum& intn)
+inline raw_ostream&
+operator<< (raw_ostream& os, const IntNum& intn)
 {
     intn.Print(os);
     return os;

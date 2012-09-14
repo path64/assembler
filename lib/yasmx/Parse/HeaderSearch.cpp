@@ -30,7 +30,7 @@
 //
 #include "yasmx/Parse/HeaderSearch.h"
 
-#include "llvm/System/Path.h"
+#include "llvm/Support/Path.h"
 #include "llvm/ADT/SmallString.h"
 #include "yasmx/Basic/FileManager.h"
 #include "yasmx/Parse/IdentifierTable.h"
@@ -102,16 +102,16 @@ const char *DirectoryLookup::getName() const
 
 /// LookupFile - Lookup the specified file in this search path, returning it
 /// if it exists or returning null if not.
-const FileEntry *DirectoryLookup::LookupFile(llvm::StringRef Filename,
-                                                    HeaderSearch &HS) const
+const FileEntry *DirectoryLookup::LookupFile(StringRef Filename,
+                                             HeaderSearch &HS) const
 {
-  llvm::SmallString<1024> TmpDir;
+  SmallString<1024> TmpDir;
   // Concatenate the requested file onto the directory.
   // FIXME: Portability.  Filename concatenation should be in sys::Path.
   TmpDir += getDir()->getName();
   TmpDir.push_back('/');
   TmpDir.append(Filename.begin(), Filename.end());
-  return HS.getFileMgr().getFile(TmpDir.begin(), TmpDir.end());
+  return HS.getFileMgr().getFile(TmpDir);
 }
 
 
@@ -126,14 +126,14 @@ const FileEntry *DirectoryLookup::LookupFile(llvm::StringRef Filename,
 /// non-null, indicates where the #including file is, in case a relative search
 /// is needed.
 const FileEntry *
-HeaderSearch::LookupFile(llvm::StringRef Filename,
+HeaderSearch::LookupFile(StringRef Filename,
                          bool isAngled,
                          const DirectoryLookup *FromDir,
                          const DirectoryLookup *&CurDir,
                          const FileEntry *CurFileEnt)
 {
   // If 'Filename' is absolute, check to see if it exists and no searching.
-  if (llvm::sys::Path::isAbsolute(Filename.begin(), Filename.size())) {
+  if (llvm::sys::path::is_absolute(Filename)) {
     CurDir = 0;
 
     // If this was an #include_next "/absolute/file", fail.
@@ -149,13 +149,13 @@ HeaderSearch::LookupFile(llvm::StringRef Filename,
   // a subsequent include of "baz.h" should resolve to "whatever/foo/baz.h".
   // This search is not done for <> headers.
   if (CurFileEnt && !isAngled && !NoCurDirSearch) {
-    llvm::SmallString<1024> TmpDir;
+    SmallString<1024> TmpDir;
     // Concatenate the requested file onto the directory.
     // FIXME: Portability.  Filename concatenation should be in sys::Path.
     TmpDir += CurFileEnt->getDir()->getName();
     TmpDir.push_back('/');
     TmpDir.append(Filename.begin(), Filename.end());
-    if (const FileEntry *FE = FileMgr.getFile(TmpDir.str())) {
+    if (const FileEntry *FE = FileMgr.getFile(TmpDir)) {
       // Leave CurDir unset.
       return FE;
     }

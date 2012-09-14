@@ -46,19 +46,20 @@ namespace parser
 class YASM_STD_EXPORT GasPreproc : public Preprocessor
 {
 public:
-    GasPreproc(Diagnostic& diags, SourceManager& sm, HeaderSearch& headers);
+    GasPreproc(DiagnosticsEngine& diags,
+               SourceManager& sm,
+               HeaderSearch& headers);
     ~GasPreproc();
 
-    virtual void PredefineMacro(llvm::StringRef macronameval);
-    virtual void UndefineMacro(llvm::StringRef macroname);
-    virtual void DefineBuiltin(llvm::StringRef macronameval);
+    virtual void PredefineMacro(StringRef macronameval);
+    virtual void UndefineMacro(StringRef macroname);
+    virtual void DefineBuiltin(StringRef macronameval);
 
-    bool HandleInclude(llvm::StringRef filename, SourceLocation source);
+    bool HandleInclude(StringRef filename, SourceLocation source);
 
 protected:
     virtual void RegisterBuiltinMacros();
-    virtual Lexer* CreateLexer(FileID fid,
-                               const llvm::MemoryBuffer* input_buffer);
+    virtual Lexer* CreateLexer(FileID fid, const MemoryBuffer* input_buffer);
 
 private:
 };

@@ -43,54 +43,55 @@ public:
     Win64Object(const ObjectFormatModule& module, Object& object);
     virtual ~Win64Object();
 
-    virtual void AddDirectives(Directives& dirs, llvm::StringRef parser);
+    virtual void AddDirectives(Directives& dirs, StringRef parser);
 
     //virtual void InitSymbols()
     //virtual void Read()
-    virtual void Output(llvm::raw_fd_ostream& os,
+    virtual void Output(raw_fd_ostream& os,
                         bool all_syms,
                         DebugFormat& dbgfmt,
-                        Diagnostic& diags);
+                        DiagnosticsEngine& diags);
 
-    static llvm::StringRef getName() { return "Win64"; }
-    static llvm::StringRef getKeyword() { return "win64"; }
-    static llvm::StringRef getExtension() { return ".obj"; }
+    static StringRef getName() { return "Win64"; }
+    static StringRef getKeyword() { return "win64"; }
+    static StringRef getExtension() { return ".obj"; }
     static unsigned int getDefaultX86ModeBits() { return 64; }
 
-    static llvm::StringRef getDefaultDebugFormatKeyword()
+    static StringRef getDefaultDebugFormatKeyword()
     { return Win32Object::getDefaultDebugFormatKeyword(); }
-    static std::vector<llvm::StringRef> getDebugFormatKeywords()
+    static std::vector<StringRef> getDebugFormatKeywords()
     { return Win32Object::getDebugFormatKeywords(); }
 
     static bool isOkObject(Object& object)
     { return Win32Object::isOkObject(object); }
-    static bool Taste(const llvm::MemoryBuffer& in,
+    static bool Taste(const MemoryBuffer& in,
                       /*@out@*/ std::string* arch_keyword,
                       /*@out@*/ std::string* machine)
     { return false; }
 
 private:
-    virtual bool InitSection(llvm::StringRef name,
+    virtual bool InitSection(StringRef name,
                              Section& section,
                              CoffSection* coffsect,
                              SourceLocation source,
-                             Diagnostic& diags);
+                             DiagnosticsEngine& diags);
 
-    bool CheckProcFrameState(SourceLocation dir_source, Diagnostic& diags);
+    bool CheckProcFrameState(SourceLocation dir_source,
+                             DiagnosticsEngine& diags);
 
-    void DirProcFrame(DirectiveInfo& info, Diagnostic& diags);
-    void DirPushReg(DirectiveInfo& info, Diagnostic& diags);
-    void DirSetFrame(DirectiveInfo& info, Diagnostic& diags);
-    void DirAllocStack(DirectiveInfo& info, Diagnostic& diags);
+    void DirProcFrame(DirectiveInfo& info, DiagnosticsEngine& diags);
+    void DirPushReg(DirectiveInfo& info, DiagnosticsEngine& diags);
+    void DirSetFrame(DirectiveInfo& info, DiagnosticsEngine& diags);
+    void DirAllocStack(DirectiveInfo& info, DiagnosticsEngine& diags);
 
     void SaveCommon(DirectiveInfo& info,
                     UnwindCode::Opcode op,
-                    Diagnostic& diags);
-    void DirSaveReg(DirectiveInfo& info, Diagnostic& diags);
-    void DirSaveXMM128(DirectiveInfo& info, Diagnostic& diags);
-    void DirPushFrame(DirectiveInfo& info, Diagnostic& diags);
-    void DirEndProlog(DirectiveInfo& info, Diagnostic& diags);
-    void DirEndProcFrame(DirectiveInfo& info, Diagnostic& diags);
+                    DiagnosticsEngine& diags);
+    void DirSaveReg(DirectiveInfo& info, DiagnosticsEngine& diags);
+    void DirSaveXMM128(DirectiveInfo& info, DiagnosticsEngine& diags);
+    void DirPushFrame(DirectiveInfo& info, DiagnosticsEngine& diags);
+    void DirEndProlog(DirectiveInfo& info, DiagnosticsEngine& diags);
+    void DirEndProcFrame(DirectiveInfo& info, DiagnosticsEngine& diags);
 
     // data for proc_frame and related directives
     SourceLocation m_proc_frame;        // start of proc source location

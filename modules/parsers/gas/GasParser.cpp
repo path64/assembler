@@ -41,10 +41,11 @@ using namespace yasm;
 using namespace yasm::parser;
 
 GasParser::GasParser(const ParserModule& module,
-                     Diagnostic& diags,
+                     DiagnosticsEngine& diags,
                      SourceManager& sm,
                      HeaderSearch& headers)
-    : ParserImpl(module, m_gas_preproc)
+    : Parser(module)
+    , ParserImpl(m_gas_preproc)
     , m_gas_preproc(diags, sm, headers)
     , m_intel(false)
     , m_reg_prefix(true)
@@ -165,7 +166,8 @@ GasParser::GasParser(const ParserModule& module,
     };
 
     for (size_t i=0; i<sizeof(gas_dirs_init)/sizeof(gas_dirs_init[0]); ++i)
-        m_gas_dirs[gas_dirs_init[i].name] = &gas_dirs_init[i];
+        m_gas_dirs.GetOrCreateValue(gas_dirs_init[i].name, &gas_dirs_init[i])
+            .setCaseInsensitive();
 }
 
 GasParser::~GasParser()
@@ -173,7 +175,7 @@ GasParser::~GasParser()
 }
 
 void
-GasParser::Parse(Object& object, Directives& dirs, Diagnostic& diags)
+GasParser::Parse(Object& object, Directives& dirs, DiagnosticsEngine& diags)
 {
     m_object = &object;
     m_dirs = &dirs;
@@ -215,7 +217,7 @@ GasParser::Parse(Object& object, Directives& dirs, Diagnostic& diags)
 }
 
 void
-GasParser::AddDirectives(Directives& dirs, llvm::StringRef parser)
+GasParser::AddDirectives(Directives& dirs, StringRef parser)
 {
     if (parser.equals_lower("gas") || parser.equals_lower("gnu"))
     {
@@ -223,6 +225,12 @@ GasParser::AddDirectives(Directives& dirs, llvm::StringRef parser)
         dirs.Add(".global", &DirGlobalMulti, Directives::ID_REQUIRED);
         dirs.Add(".globl",  &DirGlobalMulti, Directives::ID_REQUIRED);
     }
+}
+
+Preprocessor&
+GasParser::getPreprocessor() const
+{
+    return ParserImpl::getPreprocessor();
 }
 
 void

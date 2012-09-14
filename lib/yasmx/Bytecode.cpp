@@ -68,7 +68,7 @@ Bytecode::Contents::Expand(Bytecode& bc,
                            bool* keep,
                            /*@out@*/ long* neg_thres,
                            /*@out@*/ long* pos_thres,
-                           Diagnostic& diags)
+                           DiagnosticsEngine& diags)
 {
     assert(false && "bytecode does not have any dependent spans");
     return false;
@@ -136,7 +136,7 @@ Bytecode::swap(Bytecode& oth)
 }
 
 bool
-Bytecode::Finalize(Diagnostic& diags)
+Bytecode::Finalize(DiagnosticsEngine& diags)
 {
     for (std::vector<Fixup>::iterator i=m_fixed_fixups.begin(),
          end=m_fixed_fixups.end(); i != end; ++i)
@@ -169,7 +169,7 @@ Bytecode::Finalize(Diagnostic& diags)
 }
 
 bool
-Bytecode::CalcLen(const AddSpanFunc& add_span, Diagnostic& diags)
+Bytecode::CalcLen(const AddSpanFunc& add_span, DiagnosticsEngine& diags)
 {
     if (m_contents.get() == 0)
     {
@@ -190,7 +190,7 @@ Bytecode::Expand(int span,
                  bool* keep,
                  /*@out@*/ long* neg_thres,
                  /*@out@*/ long* pos_thres,
-                 Diagnostic& diags)
+                 DiagnosticsEngine& diags)
 {
     if (m_contents.get() == 0)
         return true;
@@ -265,7 +265,7 @@ Bytecode::Output(BytecodeOutput& bc_out)
 }
 
 unsigned long
-Bytecode::UpdateOffset(unsigned long offset, Diagnostic& diags)
+Bytecode::UpdateOffset(unsigned long offset, DiagnosticsEngine& diags)
 {
     if (m_contents.get() != 0 &&
         m_contents->getSpecial() == Contents::SPECIAL_OFFSET)
@@ -318,7 +318,7 @@ Bytecode::Write(pugi::xml_node out) const
     if (m_index != ~0UL)
         root.append_attribute("index") = m_index;
     root.append_attribute("id") =
-        llvm::Twine::utohexstr((uint64_t)this).str().c_str();
+        Twine::utohexstr((uint64_t)this).str().c_str();
     root.append_attribute("source") = m_source.getRawEncoding();
     root.append_attribute("offset") = m_offset;
 

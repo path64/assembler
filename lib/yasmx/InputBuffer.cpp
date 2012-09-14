@@ -85,7 +85,7 @@ ReadN(InputBuffer& input, int n, bool sign)
 
     // Read the buffer into an array of words
     unsigned int nwords = (n+63)/64;
-    llvm::SmallVector<uint64_t, 4> words(nwords);
+    SmallVector<uint64_t, 4> words(nwords);
 
     if (input.isBigEndian())
     {
@@ -128,7 +128,7 @@ ReadN(InputBuffer& input, int n, bool sign)
     llvm::APInt val(n, nwords, &words[0]);
     // Zero extend if needed to make positive number
     if (!sign && val.isNegative())
-        val.zext(n+1);
+        val = val.zext(n+1);
 
     // Convert to intnum
     IntNum intn;

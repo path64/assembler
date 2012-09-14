@@ -59,11 +59,11 @@ namespace {
 class CoffOutput : public BytecodeStreamOutput
 {
 public:
-    CoffOutput(llvm::raw_ostream& os,
+    CoffOutput(raw_ostream& os,
                CoffObject& objfmt,
                Object& object,
                bool all_syms,
-               Diagnostic& diags);
+               DiagnosticsEngine& diags);
     ~CoffOutput();
 
     bool OutputSection(Section& sect);
@@ -87,11 +87,11 @@ private:
 };
 } // anonymous namespace
 
-CoffOutput::CoffOutput(llvm::raw_ostream& os,
+CoffOutput::CoffOutput(raw_ostream& os,
                        CoffObject& objfmt,
                        Object& object,
                        bool all_syms,
-                       Diagnostic& diags)
+                       DiagnosticsEngine& diags)
     : BytecodeStreamOutput(os, diags)
     , m_objfmt(objfmt)
     , m_object(object)
@@ -508,10 +508,10 @@ CoffOutput::OutputSectionHeader(const Section& sect)
 }
 
 void
-CoffObject::Output(llvm::raw_fd_ostream& os,
+CoffObject::Output(raw_fd_ostream& os,
                    bool all_syms,
                    DebugFormat& dbgfmt,
-                   Diagnostic& diags)
+                   DiagnosticsEngine& diags)
 {
     // Update file symbol filename
     assert(m_file_coffsym != 0);

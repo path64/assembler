@@ -45,10 +45,10 @@ using namespace yasm::objfmt;
 
 const char* ElfSection::key = "objfmt::elf::ElfSection";
 
-ElfSection::ElfSection(const ElfConfig&             config,
-                       const llvm::MemoryBuffer&    in,
-                       ElfSectionIndex              index,
-                       Diagnostic&                  diags)
+ElfSection::ElfSection(const ElfConfig&     config,
+                       const MemoryBuffer&  in,
+                       ElfSectionIndex      index,
+                       DiagnosticsEngine&   diags)
     : m_config(config)
     , m_index(index)
     , m_rel_name_index(0)
@@ -198,7 +198,7 @@ ElfSection::Write(pugi::xml_node out) const
 #endif // WITH_XML
 
 unsigned long
-ElfSection::Write(llvm::raw_ostream& os, Bytes& scratch) const
+ElfSection::Write(raw_ostream& os, Bytes& scratch) const
 {
     scratch.resize(0);
     m_config.setEndian(scratch);
@@ -241,6 +241,15 @@ ElfSection::Write(llvm::raw_ostream& os, Bytes& scratch) const
     return scratch.size();
 }
 
+static void
+NoAddSpan(Bytecode& bc,
+          int id,
+          const Value& value,
+          long neg_thres,
+          long pos_thres)
+{
+}
+
 std::auto_ptr<Section>
 ElfSection::CreateSection(const StringTable& shstrtab) const
 {
@@ -259,8 +268,9 @@ ElfSection::CreateSection(const StringTable& shstrtab) const
     {
         Bytecode& gap =
             section->AppendGap(m_size.getUInt(), SourceLocation());
-        Diagnostic nodiags(0);
-        gap.CalcLen(0, nodiags);    // force length calculation of gap
+        IntrusiveRefCntPtr<DiagnosticIDs> diagids(new DiagnosticIDs);
+        DiagnosticsEngine nodiags(diagids);
+        gap.CalcLen(NoAddSpan, nodiags); // force length calculation
     }
 
     return section;
@@ -268,8 +278,8 @@ ElfSection::CreateSection(const StringTable& shstrtab) const
 
 bool
 ElfSection::LoadSectionData(Section& sect,
-                            const llvm::MemoryBuffer& in,
-                            Diagnostic& diags) const
+                            const MemoryBuffer& in,
+                            DiagnosticsEngine& diags) const
 {
     if (sect.isBSS())
         return true;
@@ -285,12 +295,12 @@ ElfSection::LoadSectionData(Section& sect,
         return false;
     }
 
-    sect.bytecodes_front().getFixed().Write(inbuf.Read(size), size);
+    sect.bytecodes_front().getFixed().Write(inbuf.Read(size));
     return true;
 }
 
 unsigned long
-ElfSection::WriteRel(llvm::raw_ostream& os,
+ElfSection::WriteRel(raw_ostream& os,
                      ElfSectionIndex symtab_idx,
                      Section& sect,
                      Bytes& scratch)
@@ -339,11 +349,11 @@ ElfSection::WriteRel(llvm::raw_ostream& os,
 }
 
 unsigned long
-ElfSection::WriteRelocs(llvm::raw_ostream& os,
+ElfSection::WriteRelocs(raw_ostream& os,
                         Section& sect,
                         Bytes& scratch,
                         const ElfMachine& machine,
-                        Diagnostic& diags)
+                        DiagnosticsEngine& diags)
 {
     if (sect.getRelocs().size() == 0)
         return 0;
@@ -374,12 +384,12 @@ ElfSection::WriteRelocs(llvm::raw_ostream& os,
 }
 
 void
-ElfSection::ReadRelocs(const llvm::MemoryBuffer&    in,
-                       const ElfSection&            reloc_sect,
-                       Section&                     sect,
-                       const ElfMachine&            machine,
-                       const ElfSymtab&             symtab,
-                       bool                         rela) const
+ElfSection::ReadRelocs(const MemoryBuffer&  in,
+                       const ElfSection&    reloc_sect,
+                       Section&             sect,
+                       const ElfMachine&    machine,
+                       const ElfSymtab&     symtab,
+                       bool                 rela) const
 {
     unsigned long start = reloc_sect.getFileOffset();
     unsigned long end = start + reloc_sect.getSize().getUInt();

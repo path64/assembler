@@ -67,13 +67,13 @@ CoffObject::CoffObject(const ObjectFormatModule& module,
         m_machine = MACHINE_AMD64;
 }
 
-std::vector<llvm::StringRef>
+std::vector<StringRef>
 CoffObject::getDebugFormatKeywords()
 {
     static const char* keywords[] =
         {"null", "dwarf", "dwarfpass", "dwarf2", "dwarf2pass"};
     size_t keywords_size = sizeof(keywords)/sizeof(keywords[0]);
-    return std::vector<llvm::StringRef>(keywords, keywords+keywords_size);
+    return std::vector<StringRef>(keywords, keywords+keywords_size);
 }
 
 bool
@@ -92,7 +92,7 @@ CoffObject::isOkObject(Object& object)
 }
 
 void
-CoffObject::InitSymbols(llvm::StringRef parser)
+CoffObject::InitSymbols(StringRef parser)
 {
     // Add .file symbol
     SymbolRef filesym = m_object.AppendSymbol(".file");
@@ -112,18 +112,19 @@ CoffObject::~CoffObject()
 Section*
 CoffObject::AddDefaultSection()
 {
-    Diagnostic diags(NULL);
+    IntrusiveRefCntPtr<DiagnosticIDs> diagids(new DiagnosticIDs);
+    DiagnosticsEngine diags(diagids);
     Section* section = AppendSection(".text", SourceLocation(), diags);
     section->setDefault(true);
     return section;
 }
 
 bool
-CoffObject::InitSection(llvm::StringRef name,
+CoffObject::InitSection(StringRef name,
                         Section& section,
                         CoffSection* coffsect,
                         SourceLocation source,
-                        Diagnostic& diags)
+                        DiagnosticsEngine& diags)
 {
     unsigned long flags = 0;
 
@@ -163,9 +164,9 @@ CoffObject::InitSection(llvm::StringRef name,
 }
 
 Section*
-CoffObject::AppendSection(llvm::StringRef name,
+CoffObject::AppendSection(StringRef name,
                           SourceLocation source,
-                          Diagnostic& diags)
+                          DiagnosticsEngine& diags)
 {
     Section* section = new Section(name, false, false, source);
     m_object.AppendSection(std::auto_ptr<Section>(section));
@@ -194,7 +195,7 @@ CoffObject::AppendSection(llvm::StringRef name,
 }
 
 void
-CoffObject::DirGasSection(DirectiveInfo& info, Diagnostic& diags)
+CoffObject::DirGasSection(DirectiveInfo& info, DiagnosticsEngine& diags)
 {
     assert(info.isObject(m_object));
     NameValues& nvs = info.getNameValues();
@@ -206,7 +207,7 @@ CoffObject::DirGasSection(DirectiveInfo& info, Diagnostic& diags)
                      diag::err_value_string_or_id);
         return;
     }
-    llvm::StringRef sectname = sectname_nv.getString();
+    StringRef sectname = sectname_nv.getString();
 
     if (sectname.size() > 8 && !m_win32)
     {
@@ -254,7 +255,7 @@ CoffObject::DirGasSection(DirectiveInfo& info, Diagnostic& diags)
     // Parse section flags
     bool alloc = false, load = false, readonly = false, code = false;
     bool datasect = false, shared = false;
-    llvm::StringRef flagstr = flags_nv.getString();
+    StringRef flagstr = flags_nv.getString();
 
     for (size_t i=0; i<flagstr.size(); ++i)
     {
@@ -292,7 +293,7 @@ CoffObject::DirGasSection(DirectiveInfo& info, Diagnostic& diags)
             {
                 char print_flag[2] = {flagstr[i], 0};
                 diags.Report(flags_nv.getValueRange().getBegin()
-                             .getFileLocWithOffset(i),
+                             .getLocWithOffset(i),
                              diag::warn_unrecognized_section_attribute)
                     << print_flag;
             }
@@ -366,7 +367,7 @@ CoffObject::DirSectionInitHelpers(DirHelpers& helpers,
 }
 
 void
-CoffObject::DirSection(DirectiveInfo& info, Diagnostic& diags)
+CoffObject::DirSection(DirectiveInfo& info, DiagnosticsEngine& diags)
 {
     assert(info.isObject(m_object));
     NameValues& nvs = info.getNameValues();
@@ -378,7 +379,7 @@ CoffObject::DirSection(DirectiveInfo& info, Diagnostic& diags)
                      diag::err_value_string_or_id);
         return;
     }
-    llvm::StringRef sectname = sectname_nv.getString();
+    StringRef sectname = sectname_nv.getString();
 
     if (sectname.size() > 8 && !m_win32)
     {
@@ -443,14 +444,14 @@ CoffObject::DirSection(DirectiveInfo& info, Diagnostic& diags)
 }
 
 void
-CoffObject::DirIdent(DirectiveInfo& info, Diagnostic& diags)
+CoffObject::DirIdent(DirectiveInfo& info, DiagnosticsEngine& diags)
 {
     assert(info.isObject(m_object));
     DirIdentCommon(*this, ".comment", info, diags);
 }
 
 void
-CoffObject::DirGasDef(DirectiveInfo& info, Diagnostic& diags)
+CoffObject::DirGasDef(DirectiveInfo& info, DiagnosticsEngine& diags)
 {
     if (m_def_sym)
     {
@@ -465,7 +466,7 @@ CoffObject::DirGasDef(DirectiveInfo& info, Diagnostic& diags)
                      diag::err_value_id);
         return;
     }
-    llvm::StringRef symname = symname_nv.getId();
+    StringRef symname = symname_nv.getId();
     SymbolRef sym = m_object.getSymbol(symname);
 
     std::auto_ptr<CoffSymbol> coffsym(new CoffSymbol(CoffSymbol::SCL_NULL));
@@ -475,7 +476,7 @@ CoffObject::DirGasDef(DirectiveInfo& info, Diagnostic& diags)
 }
 
 void
-CoffObject::DirGasScl(DirectiveInfo& info, Diagnostic& diags)
+CoffObject::DirGasScl(DirectiveInfo& info, DiagnosticsEngine& diags)
 {
     if (!m_def_sym)
     {
@@ -492,7 +493,7 @@ CoffObject::DirGasScl(DirectiveInfo& info, Diagnostic& diags)
 }
 
 void
-CoffObject::DirGasType(DirectiveInfo& info, Diagnostic& diags)
+CoffObject::DirGasType(DirectiveInfo& info, DiagnosticsEngine& diags)
 {
     if (!m_def_sym)
     {
@@ -509,7 +510,7 @@ CoffObject::DirGasType(DirectiveInfo& info, Diagnostic& diags)
 }
 
 void
-CoffObject::DirGasEndef(DirectiveInfo& info, Diagnostic& diags)
+CoffObject::DirGasEndef(DirectiveInfo& info, DiagnosticsEngine& diags)
 {
     if (!m_def_sym)
     {
@@ -520,7 +521,7 @@ CoffObject::DirGasEndef(DirectiveInfo& info, Diagnostic& diags)
 }
 
 void
-CoffObject::DirSecRel32(DirectiveInfo& info, Diagnostic& diags)
+CoffObject::DirSecRel32(DirectiveInfo& info, DiagnosticsEngine& diags)
 {
     NameValues& nvs = info.getNameValues();
     for (NameValues::iterator i=nvs.begin(), end=nvs.end(); i != end; ++i)
@@ -534,7 +535,7 @@ CoffObject::DirSecRel32(DirectiveInfo& info, Diagnostic& diags)
 }
 
 void
-CoffObject::AddDirectives(Directives& dirs, llvm::StringRef parser)
+CoffObject::AddDirectives(Directives& dirs, StringRef parser)
 {
     static const Directives::Init<CoffObject> nasm_dirs[] =
     {

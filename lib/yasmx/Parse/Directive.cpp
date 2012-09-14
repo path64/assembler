@@ -50,16 +50,16 @@ public:
             : m_handler(handler), m_flags(flags)
         {}
         ~Dir() {}
-        void operator() (llvm::StringRef name,
+        void operator() (StringRef name,
                          DirectiveInfo& info,
-                         Diagnostic& diags);
+                         DiagnosticsEngine& diags);
 
     private:
         Directive m_handler;
         Directives::Flags m_flags;
     };
 
-    typedef llvm::StringMap<Dir> DirMap;
+    typedef llvm::StringMap<Dir, llvm::BumpPtrAllocator, false> DirMap;
     DirMap m_dirs;
 };
 
@@ -75,15 +75,16 @@ Directives::~Directives()
 }
 
 void
-Directives::Add(llvm::StringRef name, Directive handler, Flags flags)
+Directives::Add(StringRef name, Directive handler, Flags flags)
 {
-    m_impl->m_dirs[llvm::LowercaseString(name)] = Impl::Dir(handler, flags);
+    m_impl->m_dirs.GetOrCreateValue(name, Impl::Dir(handler, flags))
+        .setCaseInsensitive();
 }
 
 bool
-Directives::get(Directive* dir, llvm::StringRef name) const
+Directives::get(Directive* dir, StringRef name) const
 {
-    Impl::DirMap::iterator p = m_impl->m_dirs.find(llvm::LowercaseString(name));
+    Impl::DirMap::iterator p = m_impl->m_dirs.find(name);
     if (p == m_impl->m_dirs.end())
         return false;
 
@@ -93,9 +94,9 @@ Directives::get(Directive* dir, llvm::StringRef name) const
 }
 
 void
-Directives::Impl::Dir::operator() (llvm::StringRef name,
+Directives::Impl::Dir::operator() (StringRef name,
                                    DirectiveInfo& info,
-                                   Diagnostic& diags)
+                                   DiagnosticsEngine& diags)
 {
     NameValues& namevals = info.getNameValues();
     if ((m_flags & (ARG_REQUIRED|ID_REQUIRED)) && namevals.empty())

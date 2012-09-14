@@ -160,76 +160,95 @@ Elf64Object::isOkObject(Object& object)
     return isOkElfMachine(*object.getArch(), ELFCLASS64);
 }
 
-static bool
-TasteCommon(const llvm::MemoryBuffer& in,
-            /*@out@*/ std::string* arch_keyword,
-            /*@out@*/ std::string* machine,
-            ElfClass cls)
+Elfx32Object::~Elfx32Object()
+{
+}
+
+bool
+Elfx32Object::isOkObject(Object& object)
+{
+    return isOkElfMachine(*object.getArch(), ELFCLASS32);
+}
+
+bool
+Elf32Object::Taste(const MemoryBuffer& in,
+                   /*@out@*/ std::string* arch_keyword,
+                   /*@out@*/ std::string* machine)
 {
     ElfConfig config;
-
-    // Read header
     if (!config.ReadProgramHeader(in))
         return false;
-
-    // Check class
-    if (config.cls != cls)
+    if (config.cls != ELFCLASS32)
         return false;
-
-    // for now, just handle this here
-    switch (config.machine_type)
+    if (config.machine_type == EM_386)
     {
-        case EM_386:
-            arch_keyword->assign("x86");
-            machine->assign("x86");
-            break;
-        case EM_X86_64:
-            arch_keyword->assign("x86");
-            machine->assign("amd64");
-            break;
-        default:
-            return false;
+        arch_keyword->assign("x86");
+        machine->assign("x86");
+        return true;
     }
-    return true;
+    return false;
 }
 
 bool
-Elf32Object::Taste(const llvm::MemoryBuffer& in,
+Elf64Object::Taste(const MemoryBuffer& in,
                    /*@out@*/ std::string* arch_keyword,
                    /*@out@*/ std::string* machine)
 {
-    return TasteCommon(in, arch_keyword, machine, ELFCLASS32);
+    ElfConfig config;
+    if (!config.ReadProgramHeader(in))
+        return false;
+    if (config.cls != ELFCLASS64)
+        return false;
+    if (config.machine_type == EM_X86_64)
+    {
+        arch_keyword->assign("x86");
+        machine->assign("amd64");
+        return true;
+    }
+    return false;
 }
 
 bool
-Elf64Object::Taste(const llvm::MemoryBuffer& in,
-                   /*@out@*/ std::string* arch_keyword,
-                   /*@out@*/ std::string* machine)
+Elfx32Object::Taste(const MemoryBuffer& in,
+                    /*@out@*/ std::string* arch_keyword,
+                    /*@out@*/ std::string* machine)
 {
-    return TasteCommon(in, arch_keyword, machine, ELFCLASS64);
+    ElfConfig config;
+    if (!config.ReadProgramHeader(in))
+        return false;
+    if (config.cls != ELFCLASS32)
+        return false;
+    if (config.machine_type == EM_X86_64)
+    {
+        arch_keyword->assign("x86");
+        machine->assign("amd64");
+        return true;
+    }
+    return false;
 }
 
 static inline bool
 LoadStringTable(StringTable* strtab,
-                const llvm::MemoryBuffer& in,
+                const MemoryBuffer& in,
                 const ElfSection& elfsect,
-                Diagnostic& diags)
+                DiagnosticsEngine& diags)
 {
-    const char* start = in.getBufferStart() + elfsect.getFileOffset();
-    const char* end = start + elfsect.getSize().getUInt();
-    if (end > in.getBufferEnd())
+    size_t start = elfsect.getFileOffset();
+    size_t size = elfsect.getSize().getUInt();
+    StringRef buf = in.getBuffer().substr(start, size);
+    if (buf.size() < size)
     {
         diags.Report(SourceLocation(), diag::err_string_table_unreadable);
         return false;
     }
-    strtab->Read(reinterpret_cast<const unsigned char*>(start), end-start);
+    strtab->Read(buf);
     return true;
 }
 
 bool
-ElfObject::Read(SourceManager& sm, Diagnostic& diags)
+ElfObject::Read(SourceManager& sm, DiagnosticsEngine& diags)
 {
-    const llvm::MemoryBuffer& in = *sm.getBuffer(sm.getMainFileID());
+    const MemoryBuffer& in = *sm.getBuffer(sm.getMainFileID());
 
     // Read header
     if (!m_config.ReadProgramHeader(in))
@@ -283,7 +302,7 @@ ElfObject::Read(SourceManager& sm, Diagnostic& diags)
             return false;
         elfsects[i] = elfsect.get();
 
-        llvm::StringRef sectname = shstrtab.getString(elfsect->getName());
+        StringRef sectname = shstrtab.getString(elfsect->getName());
         if (sectname == ".strtab")
         {
             strtab_sect = elfsect.get();
@@ -392,7 +411,7 @@ ElfObject::Read(SourceManager& sm, Diagnostic& diags)
 }
 
 void
-ElfObject::InitSymbols(llvm::StringRef parser)
+ElfObject::InitSymbols(StringRef parser)
 {
     // Set object options
     m_object.getOptions().DisableGlobalSubRelative = true;
@@ -436,7 +455,7 @@ ElfObject::BuildSymbol(Symbol& sym)
 }
 
 void
-ElfObject::BuildExtern(Symbol& sym, Diagnostic& diags)
+ElfObject::BuildExtern(Symbol& sym, DiagnosticsEngine& diags)
 {
     const NameValues* objext_nvs = getObjextNameValues(sym);
 
@@ -463,7 +482,7 @@ ElfObject::BuildExtern(Symbol& sym, Diagnostic& diags)
 static bool
 GlobalNameValueFallback(NameValue& nv,
                         SourceLocation dir_source,
-                        Diagnostic& diags,
+                        DiagnosticsEngine& diags,
                         Object* object,
                         Expr::Ptr* size)
 
@@ -486,7 +505,7 @@ GlobalNameValueFallback(NameValue& nv,
 
 static inline void
 GlobalSetVis(NameValue& nv,
-             Diagnostic& diags,
+             DiagnosticsEngine& diags,
              ElfSymbolVis* vis_out,
              unsigned int* vis_count,
              SourceLocation* vis_source,
@@ -499,7 +518,7 @@ GlobalSetVis(NameValue& nv,
 
 
 void
-ElfObject::BuildGlobal(Symbol& sym, Diagnostic& diags)
+ElfObject::BuildGlobal(Symbol& sym, DiagnosticsEngine& diags)
 {
     Expr::Ptr size(0);
     unsigned long type = STT_NOTYPE;    // ElfSymbolType
@@ -550,7 +569,7 @@ ElfObject::BuildGlobal(Symbol& sym, Diagnostic& diags)
 }
 
 void
-ElfObject::BuildCommon(Symbol& sym, Diagnostic& diags)
+ElfObject::BuildCommon(Symbol& sym, DiagnosticsEngine& diags)
 {
     NameValues* objext_nvs = getObjextNameValues(sym);
     bool has_align = false;
@@ -656,7 +675,7 @@ void
 ElfObject::FinalizeSymbol(Symbol& sym,
                           StringTable& strtab,
                           bool local_names,
-                          Diagnostic& diags)
+                          DiagnosticsEngine& diags)
 {
     int vis = sym.getVisibility();
     ElfSymbol* elfsym = sym.getAssocData<ElfSymbol>();
@@ -709,12 +728,12 @@ ElfObject::FinalizeSymbol(Symbol& sym,
                     return;
                 // GCC names its internal symbols .Lxxxx; follow gas' lead and
                 // don't output these symbols even if local_names is enabled.
-                llvm::StringRef name = sym.getName();
+                StringRef name = sym.getName();
                 if (name.size() > 2 && name[0] == '.' && name[1] == 'L')
                     return;
                 // Don't output GAS parser local labels.
                 if (name.size() > 1 && name[0] == 'L' &&
-                    name.rfind('\001') != llvm::StringRef::npos)
+                    name.rfind('\001') != StringRef::npos)
                     return;
             }
 
@@ -740,10 +759,10 @@ namespace {
 class ElfOutput : public BytecodeStreamOutput
 {
 public:
-    ElfOutput(llvm::raw_fd_ostream& os,
+    ElfOutput(raw_fd_ostream& os,
               ElfObject& objfmt,
               Object& object,
-              Diagnostic& diags);
+              DiagnosticsEngine& diags);
     ~ElfOutput();
 
     void OutputGroup(ElfGroup& group);
@@ -762,17 +781,17 @@ public:
 private:
     ElfObject& m_objfmt;
     Object& m_object;
-    llvm::raw_fd_ostream& m_fd_os;
+    raw_fd_ostream& m_fd_os;
     BytecodeNoOutput m_no_output;
     SymbolRef m_GOT_sym;
     bool m_needs_GOT;
 };
 } // anonymous namespace
 
-ElfOutput::ElfOutput(llvm::raw_fd_ostream& os,
+ElfOutput::ElfOutput(raw_fd_ostream& os,
                      ElfObject& objfmt,
                      Object& object,
-                     Diagnostic& diags)
+                     DiagnosticsEngine& diags)
     : BytecodeStreamOutput(os, diags)
     , m_objfmt(objfmt)
     , m_object(object)
@@ -1013,7 +1032,9 @@ ElfOutput::OutputSection(Section& sect, StringTable& shstrtab)
 }
 
 static unsigned long
-ElfAlignOutput(llvm::raw_fd_ostream& os, unsigned int align, Diagnostic& diags)
+ElfAlignOutput(raw_fd_ostream& os,
+               unsigned int align,
+               DiagnosticsEngine& diags)
 {
     assert(isExp2(align) && "requested alignment not a power of two");
 
@@ -1039,10 +1060,10 @@ ElfAlignOutput(llvm::raw_fd_ostream& os, unsigned int align, Diagnostic& diags)
 }
 
 void
-ElfObject::Output(llvm::raw_fd_ostream& os,
+ElfObject::Output(raw_fd_ostream& os,
                   bool all_syms,
                   DebugFormat& dbgfmt,
-                  Diagnostic& diags)
+                  DiagnosticsEngine& diags)
 {
     StringTable shstrtab, strtab;
     unsigned int align = (m_config.cls == ELFCLASS32) ? 4 : 8;
@@ -1098,7 +1119,7 @@ ElfObject::Output(llvm::raw_fd_ostream& os,
             continue;
 
         ElfSymbol& elfsym = BuildSymbol(*sym);
-        llvm::SmallString<64> newname;
+        SmallString<64> newname;
         if (i->m_mode == ElfSymVersion::Standard)
         {
             // rename to name@version
@@ -1401,16 +1422,17 @@ ElfObject::Output(llvm::raw_fd_ostream& os,
 Section*
 ElfObject::AddDefaultSection()
 {
-    Diagnostic diags(NULL);
+    IntrusiveRefCntPtr<DiagnosticIDs> diagids(new DiagnosticIDs);
+    DiagnosticsEngine diags(diagids);
     Section* section = AppendSection(".text", SourceLocation(), diags);
     section->setDefault(true);
     return section;
 }
 
 Section*
-ElfObject::AppendSection(llvm::StringRef name,
+ElfObject::AppendSection(StringRef name,
                          SourceLocation source,
-                         Diagnostic& diags)
+                         DiagnosticsEngine& diags)
 {
     ElfSectionType type = SHT_PROGBITS;
     ElfSectionFlags flags = SHF_ALLOC;
@@ -1496,7 +1518,7 @@ ElfObject::AppendSection(llvm::StringRef name,
 }
 
 void
-ElfObject::DirGasSection(DirectiveInfo& info, Diagnostic& diags)
+ElfObject::DirGasSection(DirectiveInfo& info, DiagnosticsEngine& diags)
 {
     assert(info.isObject(m_object));
     NameValues& nvs = info.getNameValues();
@@ -1508,7 +1530,7 @@ ElfObject::DirGasSection(DirectiveInfo& info, Diagnostic& diags)
                      diag::err_value_string_or_id);
         return;
     }
-    llvm::StringRef sectname = nv->getString();
+    StringRef sectname = nv->getString();
 
     Section* sect = m_object.FindSection(sectname);
     if (!sect)
@@ -1536,7 +1558,7 @@ ElfObject::DirGasSection(DirectiveInfo& info, Diagnostic& diags)
     assert(elfsect != 0);
 
     int flags = 0, type = elfsect->getType();
-    llvm::StringRef flagstr = nv->getString();
+    StringRef flagstr = nv->getString();
 
     for (size_t i=0; i<flagstr.size(); ++i)
     {
@@ -1567,7 +1589,7 @@ ElfObject::DirGasSection(DirectiveInfo& info, Diagnostic& diags)
             {
                 char print_flag[2] = {flagstr[i], 0};
                 diags.Report(nv->getValueRange().getBegin()
-                             .getFileLocWithOffset(i),
+                             .getLocWithOffset(i),
                              diag::warn_unrecognized_section_attribute)
                     << print_flag;
             }
@@ -1591,7 +1613,7 @@ ElfObject::DirGasSection(DirectiveInfo& info, Diagnostic& diags)
                          diag::err_expected_ident);
             return;
         }
-        llvm::StringRef typestr = nv->getId();
+        StringRef typestr = nv->getId();
         if (typestr == "progbits")
             type = SHT_PROGBITS;
         else if (typestr == "nobits")
@@ -1686,7 +1708,7 @@ ElfObject::DirGasSection(DirectiveInfo& info, Diagnostic& diags)
 }
 
 void
-ElfObject::DirSection(DirectiveInfo& info, Diagnostic& diags)
+ElfObject::DirSection(DirectiveInfo& info, DiagnosticsEngine& diags)
 {
     assert(info.isObject(m_object));
     NameValues& nvs = info.getNameValues();
@@ -1698,7 +1720,7 @@ ElfObject::DirSection(DirectiveInfo& info, Diagnostic& diags)
                      diag::err_value_string_or_id);
         return;
     }
-    llvm::StringRef sectname = sectname_nv.getString();
+    StringRef sectname = sectname_nv.getString();
 
     Section* sect = m_object.FindSection(sectname);
     bool first = true;
@@ -1789,7 +1811,7 @@ ElfObject::DirSection(DirectiveInfo& info, Diagnostic& diags)
 }
 
 void
-ElfObject::DirType(DirectiveInfo& info, Diagnostic& diags)
+ElfObject::DirType(DirectiveInfo& info, DiagnosticsEngine& diags)
 {
     assert(info.isObject(m_object));
     NameValues& namevals = info.getNameValues();
@@ -1812,7 +1834,7 @@ ElfObject::DirType(DirectiveInfo& info, Diagnostic& diags)
         return;
     }
 
-    llvm::StringRef type = nv->getId();
+    StringRef type = nv->getId();
     if (type.equals_lower("function"))
         elfsym.setType(STT_FUNC);
     else if (type.equals_lower("object"))
@@ -1827,7 +1849,7 @@ ElfObject::DirType(DirectiveInfo& info, Diagnostic& diags)
 }
 
 void
-ElfObject::DirSize(DirectiveInfo& info, Diagnostic& diags)
+ElfObject::DirSize(DirectiveInfo& info, DiagnosticsEngine& diags)
 {
     assert(info.isObject(m_object));
     NameValues& namevals = info.getNameValues();
@@ -1856,7 +1878,7 @@ ElfObject::DirSize(DirectiveInfo& info, Diagnostic& diags)
 }
 
 void
-ElfObject::DirWeak(DirectiveInfo& info, Diagnostic& diags)
+ElfObject::DirWeak(DirectiveInfo& info, DiagnosticsEngine& diags)
 {
     assert(info.isObject(m_object));
     NameValues& namevals = info.getNameValues();
@@ -1873,7 +1895,7 @@ ElfObject::DirWeak(DirectiveInfo& info, Diagnostic& diags)
 }
 
 void
-ElfObject::DirWeakRef(DirectiveInfo& info, Diagnostic& diags)
+ElfObject::DirWeakRef(DirectiveInfo& info, DiagnosticsEngine& diags)
 {
     assert(info.isObject(m_object));
     NameValues& nvs = info.getNameValues();
@@ -1899,7 +1921,7 @@ ElfObject::DirWeakRef(DirectiveInfo& info, Diagnostic& diags)
 
 void
 ElfObject::VisibilityDir(DirectiveInfo& info,
-                         Diagnostic& diags,
+                         DiagnosticsEngine& diags,
                          ElfSymbolVis vis)
 {
     assert(info.isObject(m_object));
@@ -1917,30 +1939,30 @@ ElfObject::VisibilityDir(DirectiveInfo& info,
 }
 
 void
-ElfObject::DirInternal(DirectiveInfo& info, Diagnostic& diags)
+ElfObject::DirInternal(DirectiveInfo& info, DiagnosticsEngine& diags)
 {
     VisibilityDir(info, diags, STV_INTERNAL);
 }
 
 void
-ElfObject::DirHidden(DirectiveInfo& info, Diagnostic& diags)
+ElfObject::DirHidden(DirectiveInfo& info, DiagnosticsEngine& diags)
 {
     VisibilityDir(info, diags, STV_HIDDEN);
 }
 
 void
-ElfObject::DirProtected(DirectiveInfo& info, Diagnostic& diags)
+ElfObject::DirProtected(DirectiveInfo& info, DiagnosticsEngine& diags)
 {
     VisibilityDir(info, diags, STV_PROTECTED);
 }
 
 void
-ElfObject::DirSymVer(DirectiveInfo& info, Diagnostic& diags)
+ElfObject::DirSymVer(DirectiveInfo& info, DiagnosticsEngine& diags)
 {
     assert(info.isObject(m_object));
     NameValues& namevals = info.getNameValues();
     NameValues::iterator nv = namevals.begin(), end = namevals.end();
-    llvm::StringRef real = nv->getId();
+    StringRef real = nv->getId();
     ++nv;
 
     // name
@@ -1949,7 +1971,7 @@ ElfObject::DirSymVer(DirectiveInfo& info, Diagnostic& diags)
         diags.Report(nv->getValueRange().getBegin(), diag::err_expected_ident);
         return;
     }
-    llvm::StringRef name = nv->getId();
+    StringRef name = nv->getId();
     ++nv;
 
     // @, @@, @@@ portion
@@ -1978,7 +2000,7 @@ ElfObject::DirSymVer(DirectiveInfo& info, Diagnostic& diags)
         diags.Report(nv->getValueRange().getBegin(), diag::err_expected_ident);
         return;
     }
-    llvm::StringRef version = nv->getId();
+    StringRef version = nv->getId();
 
     ElfSymVersion::Mode mode;
     switch (numat)
@@ -1993,14 +2015,14 @@ ElfObject::DirSymVer(DirectiveInfo& info, Diagnostic& diags)
 }
 
 void
-ElfObject::DirIdent(DirectiveInfo& info, Diagnostic& diags)
+ElfObject::DirIdent(DirectiveInfo& info, DiagnosticsEngine& diags)
 {
     assert(info.isObject(m_object));
     DirIdentCommon(*this, ".comment", info, diags);
 }
 
 void
-ElfObject::DirVersion(DirectiveInfo& info, Diagnostic& diags)
+ElfObject::DirVersion(DirectiveInfo& info, DiagnosticsEngine& diags)
 {
     assert(info.isObject(m_object));
 
@@ -2018,7 +2040,7 @@ ElfObject::DirVersion(DirectiveInfo& info, Diagnostic& diags)
                          diag::err_value_string);
             continue;
         }
-        llvm::StringRef str = nv->getString();
+        StringRef str = nv->getString();
         EndianState endian;
         m_config.setEndian(endian);
         AppendData(*note, str.size(), 4, endian);   // name size
@@ -2029,7 +2051,7 @@ ElfObject::DirVersion(DirectiveInfo& info, Diagnostic& diags)
     }
 }
 
-std::vector<llvm::StringRef>
+std::vector<StringRef>
 ElfObject::getDebugFormatKeywords()
 {
     static const char* keywords[] =
@@ -2043,11 +2065,11 @@ ElfObject::getDebugFormatKeywords()
         "dwarf2pass"
     };
     size_t keywords_size = sizeof(keywords)/sizeof(keywords[0]);
-    return std::vector<llvm::StringRef>(keywords, keywords+keywords_size);
+    return std::vector<StringRef>(keywords, keywords+keywords_size);
 }
 
 void
-ElfObject::AddDirectives(Directives& dirs, llvm::StringRef parser)
+ElfObject::AddDirectives(Directives& dirs, StringRef parser)
 {
     static const Directives::Init<ElfObject> nasm_dirs[] =
     {
@@ -2110,4 +2132,6 @@ yasm_objfmt_elf_DoRegister()
                    ObjectFormatModuleImpl<Elf32Object> >("elf32");
     RegisterModule<ObjectFormatModule,
                    ObjectFormatModuleImpl<Elf64Object> >("elf64");
+    RegisterModule<ObjectFormatModule,
+                   ObjectFormatModuleImpl<Elfx32Object> >("elfx32");
 }

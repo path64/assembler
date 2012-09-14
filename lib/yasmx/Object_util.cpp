@@ -40,9 +40,9 @@ using namespace yasm;
 
 void
 yasm::DirIdentCommon(ObjectFormat& objfmt,
-                     llvm::StringRef sectname,
+                     StringRef sectname,
                      DirectiveInfo& info,
-                     Diagnostic& diags)
+                     DiagnosticsEngine& diags)
 {
     NameValues& namevals = info.getNameValues();
     // Accept, but do nothing with empty ident

@@ -29,6 +29,7 @@
 /// POSSIBILITY OF SUCH DAMAGE.
 /// @endlicense
 ///
+#include "yasmx/Basic/LLVM.h"
 #include "yasmx/Config/export.h"
 #include "yasmx/Config/functional.h"
 
@@ -38,7 +39,7 @@
 namespace yasm
 {
 
-class Diagnostic;
+class DiagnosticsEngine;
 class Expr;
 class ExprTerm;
 
@@ -48,7 +49,7 @@ class ExprTerm;
 /// @param diags        diagnostic reporting
 /// @warning Only valid /after/ optimization.
 YASM_LIB_EXPORT
-void SimplifyCalcDist(Expr& e, Diagnostic& diags);
+void SimplifyCalcDist(Expr& e, DiagnosticsEngine& diags);
 
 /// Simplify instances of Symbol-Symbol [Symbol+(-1*Symbol)] in an expression
 /// into integers if possible by calling CalcDistNoBC().
@@ -58,10 +59,10 @@ void SimplifyCalcDist(Expr& e, Diagnostic& diags);
 /// @param e            expression
 /// @param diags        diagnostic reporting
 YASM_LIB_EXPORT
-void SimplifyCalcDistNoBC(Expr& e, Diagnostic& diags);
+void SimplifyCalcDistNoBC(Expr& e, DiagnosticsEngine& diags);
 
 YASM_LIB_EXPORT
-int SubstDist(Expr& e, Diagnostic& diags,
+int SubstDist(Expr& e, DiagnosticsEngine& diags,
               const TR1::function<void (unsigned int subst,
                                         Location loc,
                                         Location loc2)>& func);
@@ -80,28 +81,23 @@ int SubstDist(Expr& e, Diagnostic& diags,
 ///                     Substitutions must be integer or float terms.
 ///                     If null, any substitution in the expr will result in
 ///                     evaluation failure and a false return
-/// @param nsubst       size of substitution terms array
 /// @param valueloc     replace symbols and locations with their values
 /// @param zeroreg      replace registers with zero?
 /// @return True if successful.
 YASM_LIB_EXPORT
 bool Evaluate(const Expr& e,
-              Diagnostic& diags,
+              DiagnosticsEngine& diags,
               ExprTerm* result,
-              const ExprTerm* subst,
-              unsigned int nsubst,
+              ArrayRef<ExprTerm> subst,
               bool valueloc=true,
               bool zeroreg=false);
 
-inline bool
-Evaluate(const Expr& e,
-         Diagnostic& diags,
-         ExprTerm* result,
-         bool valueloc=true,
-         bool zeroreg=false)
-{
-    return Evaluate(e, diags, result, 0, 0, valueloc, zeroreg);
-}
+YASM_LIB_EXPORT
+bool Evaluate(const Expr& e,
+              DiagnosticsEngine& diags,
+              ExprTerm* result,
+              bool valueloc=true,
+              bool zeroreg=false);
 
 } // namespace yasm
 

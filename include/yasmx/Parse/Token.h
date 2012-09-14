@@ -33,6 +33,7 @@
 #include <cassert>
 
 #include "llvm/ADT/StringRef.h"
+#include "yasmx/Basic/LLVM.h"
 #include "yasmx/Basic/SourceLocation.h"
 
 namespace yasm
@@ -146,7 +147,7 @@ public:
     /// getEndLocation - Return a source location identifier one past the end
     /// of this token.
     SourceLocation getEndLocation() const
-    { return m_loc.getFileLocWithOffset(m_len); }
+    { return m_loc.getLocWithOffset(m_len); }
 
     /// getSourceRange - Return a source range for the token.
     SourceRange getSourceRange() const
@@ -187,9 +188,9 @@ public:
     bool isLiteral() const
     { return (m_flags & Literal) ? true : false; }
 
-    llvm::StringRef getLiteral() const
+    StringRef getLiteral() const
     {
-        return llvm::StringRef(getLiteralData(), getLength());
+        return StringRef(getLiteralData(), getLength());
     }
 
     /// For a literal token (numeric constant, string, etc), this

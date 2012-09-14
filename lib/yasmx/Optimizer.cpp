@@ -34,6 +34,7 @@
 #include <memory>
 #include <vector>
 
+#include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/Statistic.h"
@@ -192,7 +193,7 @@ OffsetSetter::Write(pugi::xml_node out) const
 {
     pugi::xml_node root = out.append_child("OffsetSetter");
     root.append_attribute("bc") =
-        llvm::Twine::utohexstr((uint64_t)m_bc).str().c_str();
+        Twine::utohexstr((uint64_t)m_bc).str().c_str();
     root.append_attribute("curval") = m_cur_val;
     root.append_attribute("newval") = m_new_val;
     root.append_attribute("thres") = m_thres;
@@ -236,8 +237,8 @@ public:
          size_t os_index);
     ~Span();
 
-    bool CreateTerms(Optimizer::Impl* optimize, Diagnostic& diags);
-    bool RecalcNormal(Diagnostic& diags);
+    bool CreateTerms(Optimizer::Impl* optimize, DiagnosticsEngine& diags);
+    bool RecalcNormal(DiagnosticsEngine& diags);
 
     std::string getName() const;
 #ifdef WITH_XML
@@ -284,7 +285,7 @@ namespace yasm {
 class Optimizer::Impl
 {
 public:
-    Impl(Diagnostic& diags);
+    Impl(DiagnosticsEngine& diags);
     ~Impl();
 
     void Step1b();
@@ -301,7 +302,7 @@ public:
                     Span& span);
     void ExpandTerm(IntervalTreeNode<Span::Term*> * node, long len_diff);
 
-    Diagnostic& m_diags;
+    DiagnosticsEngine& m_diags;
 
     typedef std::list<Span*> Spans;
     Spans m_spans;      // ownership list
@@ -395,7 +396,7 @@ Span::AddTerm(unsigned int subst, Location loc, Location loc2)
 }
 
 bool
-Span::CreateTerms(Optimizer::Impl* optimize, Diagnostic& diags)
+Span::CreateTerms(Optimizer::Impl* optimize, DiagnosticsEngine& diags)
 {
     // Split out sym-sym terms in absolute portion of dependent value
     if (m_depval.hasAbs())
@@ -430,7 +431,7 @@ Span::CreateTerms(Optimizer::Impl* optimize, Diagnostic& diags)
 // Recalculate span value based on current span replacement values.
 // Returns True if span needs expansion (e.g. exceeded thresholds).
 bool
-Span::RecalcNormal(Diagnostic& diags)
+Span::RecalcNormal(DiagnosticsEngine& diags)
 {
     ++num_recalc;
     m_new_val = 0;
@@ -445,8 +446,8 @@ Span::RecalcNormal(Diagnostic& diags)
         for (Terms::iterator i=m_span_terms.begin(), end=m_span_terms.end();
              i != end; ++i)
             *m_expr_terms[i->m_subst].getIntNum() = i->m_new_val;
-        if (!Evaluate(*m_depval.getAbs(), diags, &result, &m_expr_terms[0],
-                      m_expr_terms.size(), false, false)
+        if (!Evaluate(*m_depval.getAbs(), diags, &result, m_expr_terms, false,
+                      false)
             || !result.isType(ExprTerm::INT))
             m_new_val = LONG_MAX;   // too complex; force to longest form
         else
@@ -473,7 +474,7 @@ Span::~Span()
 std::string
 Span::getName() const
 {
-    llvm::SmallString<32> ss;
+    SmallString<32> ss;
     llvm::raw_svector_ostream oss(ss);
     oss << "SPAN{" << m_bc.getIndex() << ',' << m_id << '}';
     return oss.str();
@@ -485,14 +486,14 @@ Span::Write(pugi::xml_node out) const
 {
     pugi::xml_node root = out.append_child("Span");
     root.append_attribute("bc") =
-        llvm::Twine::utohexstr((uint64_t)(&m_bc)).str().c_str();
+        Twine::utohexstr((uint64_t)(&m_bc)).str().c_str();
     root.append_attribute("id") = m_id;
 
     if (!m_depval.hasAbs() || m_depval.isRelative())
         append_child(root, "DepVal", m_depval);
     else
     {
-        llvm::SmallString<256> ss;
+        SmallString<256> ss;
         llvm::raw_svector_ostream oss(ss);
         oss << *m_depval.getAbs() << '\0';
         append_child(root, "DepVal", oss.str().data());
@@ -533,7 +534,7 @@ Span::WriteRef(pugi::xml_node out) const
 }
 #endif // WITH_XML
 
-Optimizer::Impl::Impl(Diagnostic& diags)
+Optimizer::Impl::Impl(DiagnosticsEngine& diags)
     : m_diags(diags)
 {
     // Create an placeholder offset setter for spans to point to; this will
@@ -948,7 +949,7 @@ Optimizer::Impl::Step2()
     }
 }
 
-Optimizer::Optimizer(Diagnostic& diags)
+Optimizer::Optimizer(DiagnosticsEngine& diags)
     : m_impl(new Impl(diags))
 {
 }

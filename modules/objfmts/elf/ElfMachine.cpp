@@ -38,8 +38,8 @@ using namespace yasm::objfmt;
 namespace {
 struct MachineCheckCreate
 {
-    bool (*Match) (llvm::StringRef arch_keyword,
-                   llvm::StringRef arch_machine,
+    bool (*Match) (StringRef arch_keyword,
+                   StringRef arch_machine,
                    ElfClass cls);
     std::auto_ptr<ElfMachine> (*Create) ();
 };
@@ -49,6 +49,7 @@ static const MachineCheckCreate machines[] =
 {
     {&impl::ElfMatch_x86_x86, &impl::ElfCreate_x86_x86},
     {&impl::ElfMatch_x86_amd64, &impl::ElfCreate_x86_amd64},
+    {&impl::ElfMatch_x86_x32, &impl::ElfCreate_x86_x32},
 };
 static const size_t nmachines = sizeof(machines)/sizeof(machines[0]);
 

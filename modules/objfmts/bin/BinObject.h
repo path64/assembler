@@ -36,7 +36,7 @@
 
 namespace yasm
 {
-class Diagnostic;
+class DiagnosticsEngine;
 class DirectiveInfo;
 class Expr;
 class IntNum;
@@ -54,41 +54,41 @@ public:
     /// Destructor.
     ~BinObject();
 
-    void AddDirectives(Directives& dirs, llvm::StringRef parser);
+    void AddDirectives(Directives& dirs, StringRef parser);
 
-    void Output(llvm::raw_fd_ostream& os,
+    void Output(raw_fd_ostream& os,
                 bool all_syms,
                 DebugFormat& dbgfmt,
-                Diagnostic& diags);
+                DiagnosticsEngine& diags);
 
     Section* AddDefaultSection();
-    Section* AppendSection(llvm::StringRef name,
+    Section* AppendSection(StringRef name,
                            SourceLocation source,
-                           Diagnostic& diags);
+                           DiagnosticsEngine& diags);
 
-    static llvm::StringRef getName() { return "Flat format binary"; }
-    static llvm::StringRef getKeyword() { return "bin"; }
-    static llvm::StringRef getExtension() { return ""; }
+    static StringRef getName() { return "Flat format binary"; }
+    static StringRef getKeyword() { return "bin"; }
+    static StringRef getExtension() { return ""; }
     static unsigned int getDefaultX86ModeBits() { return 16; }
-    static llvm::StringRef getDefaultDebugFormatKeyword() { return "null"; }
-    static std::vector<llvm::StringRef> getDebugFormatKeywords();
+    static StringRef getDefaultDebugFormatKeyword() { return "null"; }
+    static std::vector<StringRef> getDebugFormatKeywords();
     static bool isOkObject(Object& object) { return true; }
-    static bool Taste(const llvm::MemoryBuffer& in,
+    static bool Taste(const MemoryBuffer& in,
                       /*@out@*/ std::string* arch_keyword,
                       /*@out@*/ std::string* machine)
     { return false; }
 
 private:
-    void DirSection(DirectiveInfo& info, Diagnostic& diags);
-    void DirOrg(DirectiveInfo& info, Diagnostic& diags);
-    void DirMap(DirectiveInfo& info, Diagnostic& diags);
+    void DirSection(DirectiveInfo& info, DiagnosticsEngine& diags);
+    void DirOrg(DirectiveInfo& info, DiagnosticsEngine& diags);
+    void DirMap(DirectiveInfo& info, DiagnosticsEngine& diags);
     bool setMapFilename(const NameValue& nv,
                         SourceLocation dir_source,
-                        Diagnostic& diags);
+                        DiagnosticsEngine& diags);
 
     void OutputMap(const IntNum& origin,
                    const BinGroups& groups,
-                   Diagnostic& diags) const;
+                   DiagnosticsEngine& diags) const;
 
     enum
     {

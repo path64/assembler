@@ -46,7 +46,7 @@ void
 yasm::AppendByte(BytecodeContainer& container,
                  std::auto_ptr<Expr> expr,
                  SourceLocation source,
-                 Diagnostic& diags)
+                 DiagnosticsEngine& diags)
 {
     expr->Simplify(diags);
     if (expr->isIntNum())
@@ -96,7 +96,7 @@ yasm::AppendData(BytecodeContainer& container,
                  unsigned int size,
                  const Arch& arch,
                  SourceLocation source,
-                 Diagnostic& diags)
+                 DiagnosticsEngine& diags)
 {
     expr->Simplify(diags);
     if (expr->isIntNum())
@@ -110,25 +110,24 @@ yasm::AppendData(BytecodeContainer& container,
 
 void
 yasm::AppendData(BytecodeContainer& container,
-                 llvm::StringRef str,
+                 StringRef str,
                  bool append_zero)
 {
     Bytes& fixed = container.FreshBytecode().getFixed();
-    fixed.Write(reinterpret_cast<const unsigned char *>(str.data()),
-                str.size());
+    fixed.WriteString(str);
     if (append_zero)
         Write8(fixed, 0);
 }
 
 void
 yasm::AppendData(BytecodeContainer& container,
-                 llvm::StringRef str,
+                 StringRef str,
                  unsigned int size,
                  bool append_zero)
 {
     Bytes& fixed = container.FreshBytecode().getFixed();
+    fixed.WriteString(str);
     size_t len = str.size();
-    fixed.Write(reinterpret_cast<const unsigned char *>(str.data()), len);
     if (append_zero)
     {
         Write8(fixed, 0);

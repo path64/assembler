@@ -32,6 +32,7 @@
 #include <string>
 
 #include "llvm/ADT/StringRef.h"
+#include "yasmx/Basic/LLVM.h"
 #include "yasmx/Basic/SourceLocation.h"
 #include "yasmx/Config/export.h"
 #include "yasmx/Support/scoped_ptr.h"
@@ -42,7 +43,7 @@
 namespace yasm
 {
 
-class Diagnostic;
+class DiagnosticsEngine;
 class Expr;
 class Object;
 
@@ -53,7 +54,7 @@ class YASM_LIB_EXPORT Symbol : public AssocDataContainer
 
 public:
     /// Constructor.
-    explicit Symbol(llvm::StringRef name);
+    explicit Symbol(StringRef name);
 
     /// Destructor.
     ~Symbol();
@@ -81,7 +82,7 @@ public:
 
     /// Get the name of a symbol.
     /// @return Symbol name.
-    llvm::StringRef getName() const { return m_name; }
+    StringRef getName() const { return m_name; }
 
     /// Get the visibility of a symbol.
     /// @return Symbol visibility.
@@ -151,7 +152,7 @@ public:
     /// @param diags    diagnostic reporting
     void CheckedDefineEqu(const Expr& e,
                           SourceLocation source,
-                          Diagnostic& diags);
+                          DiagnosticsEngine& diags);
 
     /// Define as a label.
     /// @note Asserts if already defined.
@@ -164,7 +165,7 @@ public:
     /// @param source   source location
     void CheckedDefineLabel(Location loc,
                             SourceLocation source,
-                            Diagnostic& diags);
+                            DiagnosticsEngine& diags);
 
     /// Define a special symbol.  Special symbols have no generic associated
     /// data (such as an expression or precbc).
@@ -188,7 +189,7 @@ public:
     /// @param diags    diagnostic reporting
     void CheckedDeclare(Visibility vis,
                         SourceLocation source,
-                        Diagnostic& diags);
+                        DiagnosticsEngine& diags);
 
     /// Determine if symbol is used but is undefined.  Undefined symbols are
     /// those that are used but never defined or declared #EXTERN or #COMMON.
@@ -228,7 +229,7 @@ private:
         SPECIAL
     };
 
-    bool DefineCheck(SourceLocation source, Diagnostic& diags) const;
+    bool DefineCheck(SourceLocation source, DiagnosticsEngine& diags) const;
 
     std::string m_name;
     Type m_type;

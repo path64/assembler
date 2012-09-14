@@ -35,6 +35,7 @@
 
 #include "llvm/ADT/StringMap.h"
 #include "llvm/Support/PointerLikeTypeTraits.h"
+#include "yasmx/Basic/LLVM.h"
 #include "yasmx/Config/export.h"
 #include "yasmx/Parse/Token.h"
 #include "yasmx/Arch.h"
@@ -116,10 +117,14 @@ public:
     }
 
     /// getName - Return the actual identifier string.
-    llvm::StringRef getName() const
+    StringRef getName() const
     {
-        return llvm::StringRef(getNameStart(), getLength());
+        return StringRef(getNameStart(), getLength());
     }
+
+    bool isCaseSensitive() const { return m_entry->isCaseSensitive(); }
+    void setCaseSensitive(bool v) { m_entry->setCaseSensitive(v); }
+    void setCaseInsensitive() { m_entry->setCaseInsensitive(); }
 
     /// If this is a source-language keyword, this API
     /// can be used to cause the lexer to map identifiers to source-language
@@ -130,10 +135,10 @@ public:
     // Perform lookup of instruction/register data.
     void DoInsnLookup(const Arch& arch,
                       SourceLocation source,
-                      Diagnostic& diags);
+                      DiagnosticsEngine& diags);
     void DoRegLookup(const Arch& arch,
                      SourceLocation source,
-                     Diagnostic& diags);
+                     DiagnosticsEngine& diags);
 
     bool isUnknown()
     {
@@ -237,7 +242,8 @@ class IdentifierTable
 {
     // Shark shows that using MallocAllocator is *much* slower than using this
     // BumpPtrAllocator!
-    typedef llvm::StringMap<IdentifierInfo*, llvm::BumpPtrAllocator> HashTable;
+    typedef llvm::StringMap<IdentifierInfo*, llvm::BumpPtrAllocator,
+                            false> HashTable;
     HashTable m_hash_table;
 
 public:
@@ -247,10 +253,10 @@ public:
     }
   
     /// Return the identifier token info for the specified named identifier.
-    IdentifierInfo& get(const char* name_start, const char* name_end)
+    IdentifierInfo& get(StringRef name)
     {
         llvm::StringMapEntry<IdentifierInfo*>& entry =
-            m_hash_table.GetOrCreateValue(name_start, name_end);
+            m_hash_table.GetOrCreateValue(name);
     
         IdentifierInfo* ii = entry.getValue();
         if (ii) return *ii;
@@ -265,11 +271,6 @@ public:
         ii->m_entry = &entry;
 
         return *ii;
-    }
-
-    IdentifierInfo& get(llvm::StringRef name)
-    {
-        return get(name.begin(), name.end());
     }
 
     typedef HashTable::const_iterator iterator;

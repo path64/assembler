@@ -26,6 +26,7 @@
 
 #include "yasmx/StringTable.h"
 
+#include "llvm/ADT/StringRef.h"
 #include "llvm/Support/raw_ostream.h"
 
 
@@ -42,7 +43,7 @@ StringTable::~StringTable()
 }
 
 unsigned long
-StringTable::getIndex(llvm::StringRef str)
+StringTable::getIndex(StringRef str)
 {
     unsigned long end = m_storage.size();
     m_storage.insert(m_storage.end(), str.begin(), str.end());
@@ -50,21 +51,21 @@ StringTable::getIndex(llvm::StringRef str)
     return m_first_index+end;
 }
 
-llvm::StringRef
+StringRef
 StringTable::getString(unsigned long index) const
 {
     return &m_storage.at(index-m_first_index);
 }
 
 void
-StringTable::Write(llvm::raw_ostream& os) const
+StringTable::Write(raw_ostream& os) const
 {
     os.write(&m_storage[0], m_storage.size());
 }
 
 void
-StringTable::Read(const unsigned char* buf, unsigned long size)
+StringTable::Read(StringRef buf)
 {
     m_storage.clear();
-    m_storage.insert(m_storage.end(), buf, buf+size);
+    m_storage.insert(m_storage.end(), buf.begin(), buf.end());
 }

@@ -64,21 +64,23 @@ public:
     bool operator() (Expr& e, ParserImpl& parser, bool* handled) const;
 };
 
-class YASM_STD_EXPORT NasmParser : public ParserImpl
+class YASM_STD_EXPORT NasmParser : public Parser, public ParserImpl
 {
 public:
     NasmParser(const ParserModule& module,
-               Diagnostic& diags,
+               DiagnosticsEngine& diags,
                SourceManager& sm,
                HeaderSearch& headers);
     ~NasmParser();
 
-    void AddDirectives(Directives& dirs, llvm::StringRef parser);
+    void AddDirectives(Directives& dirs, StringRef parser);
 
-    static llvm::StringRef getName() { return "NASM-compatible parser"; }
-    static llvm::StringRef getKeyword() { return "nasm"; }
+    Preprocessor& getPreprocessor() const;
 
-    void Parse(Object& object, Directives& dirs, Diagnostic& diags);
+    static StringRef getName() { return "NASM-compatible parser"; }
+    static StringRef getKeyword() { return "nasm"; }
+
+    void Parse(Object& object, Directives& dirs, DiagnosticsEngine& diags);
 
 private:
     friend class NasmParseDirExprTerm;
@@ -97,9 +99,6 @@ private:
         Type type;
         unsigned int size;
     };
-
-    void CheckPseudoInsn(IdentifierInfo* ii);
-    bool CheckKeyword(IdentifierInfo* ii);
 
     void DefineLabel(SymbolRef sym, SourceLocation source, bool local);
 
@@ -127,10 +126,10 @@ private:
 
     SymbolRef ParseSymbol(IdentifierInfo* ii, bool* local = 0);
 
-    void DirAbsolute(DirectiveInfo& info, Diagnostic& diags);
-    void DirAlign(DirectiveInfo& info, Diagnostic& diags);
+    void DirAbsolute(DirectiveInfo& info, DiagnosticsEngine& diags);
+    void DirAlign(DirectiveInfo& info, DiagnosticsEngine& diags);
 
-    void DoDirective(llvm::StringRef name, DirectiveInfo& info);
+    void DoDirective(StringRef name, DirectiveInfo& info);
 
     Object* m_object;
     Arch* m_arch;

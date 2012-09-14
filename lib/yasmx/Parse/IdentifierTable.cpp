@@ -48,7 +48,7 @@ using namespace yasm;
 void
 IdentifierInfo::DoInsnLookup(const Arch& arch,
                              SourceLocation source,
-                             Diagnostic& diags)
+                             DiagnosticsEngine& diags)
 {
     if (m_flags & DID_INSN_LOOKUP)
         return;
@@ -61,11 +61,13 @@ IdentifierInfo::DoInsnLookup(const Arch& arch,
             ++num_insn_lookup_insn;
             m_insn = const_cast<Arch::InsnInfo*>(ip.getInsn());
             m_flags |= IS_INSN;
+            setCaseInsensitive();
             break;
         case Arch::InsnPrefix::PREFIX:
             ++num_insn_lookup_prefix;
             m_insn = const_cast<Prefix*>(ip.getPrefix());
             m_flags |= IS_PREFIX;
+            setCaseInsensitive();
             break;
         default:
             ++num_insn_lookup_none;
@@ -77,7 +79,7 @@ IdentifierInfo::DoInsnLookup(const Arch& arch,
 void
 IdentifierInfo::DoRegLookup(const Arch& arch,
                             SourceLocation source,
-                            Diagnostic& diags)
+                            DiagnosticsEngine& diags)
 {
     if (m_flags & DID_REG_LOOKUP)
         return;
@@ -90,21 +92,25 @@ IdentifierInfo::DoRegLookup(const Arch& arch,
             ++num_reg_lookup_reg;
             m_reg = const_cast<Register*>(regtmod.getReg());
             m_flags |= IS_REGISTER;
+            setCaseInsensitive();
             break;
         case Arch::RegTmod::REGGROUP:
             ++num_reg_lookup_reggroup;
             m_reg = const_cast<RegisterGroup*>(regtmod.getRegGroup());
             m_flags |= IS_REGGROUP;
+            setCaseInsensitive();
             break;
         case Arch::RegTmod::SEGREG:
             ++num_reg_lookup_segreg;
             m_reg = const_cast<SegmentRegister*>(regtmod.getSegReg());
             m_flags |= IS_SEGREG;
+            setCaseInsensitive();
             break;
         case Arch::RegTmod::TARGETMOD:
             ++num_reg_lookup_targetmod;
             m_reg = const_cast<TargetModifier*>(regtmod.getTargetMod());
             m_flags |= IS_TARGETMOD;
+            setCaseInsensitive();
             break;
         default:
             ++num_reg_lookup_none;

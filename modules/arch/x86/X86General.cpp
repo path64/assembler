@@ -92,7 +92,7 @@ X86General::~X86General()
 }
 
 bool
-X86General::Finalize(Bytecode& bc, Diagnostic& diags)
+X86General::Finalize(Bytecode& bc, DiagnosticsEngine& diags)
 {
     if (m_ea)
     {
@@ -203,7 +203,7 @@ bool
 X86General::CalcLen(Bytecode& bc,
                     /*@out@*/ unsigned long* len,
                     const Bytecode::AddSpanFunc& add_span,
-                    Diagnostic& diags)
+                    DiagnosticsEngine& diags)
 {
     unsigned long ilen = 0;
     if (m_ea != 0)
@@ -218,8 +218,6 @@ X86General::CalcLen(Bytecode& bc,
                          &ip_rel, diags))
         {
             // failed, don't bother checking rest of insn
-            diags.Report(m_ea->m_disp.getSource().getBegin(),
-                         diag::err_ea_length_unknown);
             return false;
         }
 
@@ -347,7 +345,7 @@ X86General::Expand(Bytecode& bc,
                    bool* keep,
                    /*@out@*/ long* neg_thres,
                    /*@out@*/ long* pos_thres,
-                   Diagnostic& diags)
+                   DiagnosticsEngine& diags)
 {
     if (m_ea != 0 && span == 1)
     {
@@ -510,7 +508,7 @@ X86General::Output(Bytecode& bc, BytecodeOutput& bc_out)
     return true;
 }
 
-llvm::StringRef
+StringRef
 X86General::getType() const
 {
     return "yasm::arch::X86General";
@@ -538,8 +536,8 @@ X86General::Write(pugi::xml_node out) const
         append_child(root, "Imm", *m_imm);
 
     append_child(root, "SpecialPrefix",
-                 llvm::Twine::utohexstr(m_special_prefix).str());
-    append_child(root, "REX", llvm::Twine::utohexstr(m_rex).str());
+                 Twine::utohexstr(m_special_prefix).str());
+    append_child(root, "REX", Twine::utohexstr(m_rex).str());
     if (m_default_rel)
         root.append_attribute("default_rel") = true;
     const char* postop = NULL;

@@ -40,6 +40,7 @@
 
 
 using namespace yasm;
+using llvm::APFloat;
 
 /// Look for simple identities that make the entire result constant:
 /// 0*&x, -1|x, etc.
@@ -85,52 +86,52 @@ isRightIdentity(Op::Op op, const IntNum& intn)
 }
 
 bool
-yasm::CalcFloat(llvm::APFloat* lhs,
+yasm::CalcFloat(APFloat* lhs,
                 Op::Op op,
-                const llvm::APFloat& rhs,
+                const APFloat& rhs,
                 SourceLocation source,
-                Diagnostic& diags)
+                DiagnosticsEngine& diags)
 {
-    llvm::APFloat::opStatus status;
+    APFloat::opStatus status;
     switch (op)
     {
         case Op::ADD:
-            status = lhs->add(rhs, llvm::APFloat::rmNearestTiesToEven);
+            status = lhs->add(rhs, APFloat::rmNearestTiesToEven);
             break;
         case Op::SUB:
-            status = lhs->subtract(rhs, llvm::APFloat::rmNearestTiesToEven);
+            status = lhs->subtract(rhs, APFloat::rmNearestTiesToEven);
             break;
         case Op::MUL:
-            status = lhs->multiply(rhs, llvm::APFloat::rmNearestTiesToEven);
+            status = lhs->multiply(rhs, APFloat::rmNearestTiesToEven);
             break;
         case Op::DIV:
         case Op::SIGNDIV:
-            status = lhs->divide(rhs, llvm::APFloat::rmNearestTiesToEven);
+            status = lhs->divide(rhs, APFloat::rmNearestTiesToEven);
             break;
         case Op::MOD:
         case Op::SIGNMOD:
-            status = lhs->mod(rhs, llvm::APFloat::rmNearestTiesToEven);
+            status = lhs->mod(rhs, APFloat::rmNearestTiesToEven);
             break;
         default:
-            status = llvm::APFloat::opInvalidOp;
+            status = APFloat::opInvalidOp;
             break;
     }
 
-    if (status & llvm::APFloat::opInvalidOp)
+    if (status & APFloat::opInvalidOp)
     {
         diags.Report(source, diag::err_float_invalid_op);
         return false;
     }
-    if (status & llvm::APFloat::opDivByZero)
+    if (status & APFloat::opDivByZero)
     {
         diags.Report(source, diag::err_divide_by_zero);
         return false;
     }
-    if (status & llvm::APFloat::opOverflow)
+    if (status & APFloat::opOverflow)
         diags.Report(source, diag::warn_float_overflow);
-    else if (status & llvm::APFloat::opUnderflow)
+    else if (status & APFloat::opUnderflow)
         diags.Report(source, diag::warn_float_underflow);
-    else if (status & llvm::APFloat::opInexact)
+    else if (status & APFloat::opInexact)
         diags.Report(source, diag::warn_float_inexact);
     return true;
 }
@@ -176,7 +177,7 @@ ExprTerm::ExprTerm(std::auto_ptr<IntNum> intn,
     intn->swap(static_cast<IntNum&>(m_data.intn));
 }
 
-ExprTerm::ExprTerm(std::auto_ptr<llvm::APFloat> flt,
+ExprTerm::ExprTerm(std::auto_ptr<APFloat> flt,
                    SourceLocation source,
                    int depth)
     : m_source(source), m_type(FLOAT), m_depth(depth)
@@ -194,7 +195,7 @@ ExprTerm::ExprTerm(const ExprTerm& term)
         tmp.swap(static_cast<IntNum&>(m_data.intn));
     }
     else if (m_type == FLOAT)
-        m_data.flt = new llvm::APFloat(*term.m_data.flt);
+        m_data.flt = new APFloat(*term.m_data.flt);
     else
         m_data = term.m_data;
 }
@@ -215,11 +216,11 @@ ExprTerm::PromoteToFloat(const llvm::fltSemantics& semantics)
         return;
     assert (m_type == INT && "trying to promote non-integer");
 
-    std::auto_ptr<llvm::APFloat>
-        upconvf(new llvm::APFloat(semantics, llvm::APFloat::fcZero, false));
+    std::auto_ptr<APFloat>
+        upconvf(new APFloat(semantics, APFloat::fcZero, false));
     llvm::APInt upconvi(IntNum::BITVECT_NATIVE_SIZE, 0);
     upconvf->convertFromAPInt(*getIntNum()->getBV(&upconvi), true,
-                              llvm::APFloat::rmNearestTiesToEven);
+                              APFloat::rmNearestTiesToEven);
 
     Clear();
     m_type = FLOAT;
@@ -338,7 +339,7 @@ Expr::Expr(std::auto_ptr<IntNum> intn, SourceLocation source)
     m_terms.push_back(ExprTerm(intn, source));
 }
 
-Expr::Expr(std::auto_ptr<llvm::APFloat> flt, SourceLocation source)
+Expr::Expr(std::auto_ptr<APFloat> flt, SourceLocation source)
 {
     m_terms.push_back(ExprTerm(flt, source));
 }
@@ -368,17 +369,21 @@ Expr::Cleanup()
     m_terms.erase(erasefrom, m_terms.end());
 }
 
-void
-Expr::ReduceDepth(int pos, int delta)
+/// Reduce depth of a subexpression.
+/// @param terms    expression terms
+/// @param pos      term index of subexpression operator
+/// @param delta    delta to reduce depth by
+static void
+ReduceDepth(ExprTerms& terms, int pos, int delta=1)
 {
     if (pos < 0)
-        pos += m_terms.size();
-    ExprTerm& parent = m_terms[pos];
+        pos += terms.size();
+    ExprTerm& parent = terms[pos];
     if (parent.isOp())
     {
         for (int n=pos-1; n >= 0; --n)
         {
-            ExprTerm& child = m_terms[n];
+            ExprTerm& child = terms[n];
             if (child.isEmpty())
                 continue;
             if (child.m_depth <= parent.m_depth)
@@ -390,7 +395,7 @@ Expr::ReduceDepth(int pos, int delta)
 }
 
 void
-Expr::MakeIdent(Diagnostic& diags, int pos)
+Expr::MakeIdent(DiagnosticsEngine& diags, int pos)
 {
     if (pos < 0)
         pos += m_terms.size();
@@ -415,7 +420,7 @@ Expr::MakeIdent(Diagnostic& diags, int pos)
     if (!unary)
     {
         // delete one-term non-unary operators
-        ReduceDepth(pos);       // bring up child
+        ReduceDepth(m_terms, pos);      // bring up child
         root.Clear();
     }
     else if (op < Op::NONNUM)
@@ -444,19 +449,23 @@ Expr::MakeIdent(Diagnostic& diags, int pos)
     Cleanup();
 }
 
-void
-Expr::ClearExcept(int pos, int keep)
+/// Clear all terms of a subexpression, possibly keeping a single term.
+/// @param terms    expression terms
+/// @param pos      term index of subexpression operator
+/// @param keep     term index of term to keep; -1 to clear all terms
+static void
+ClearExcept(ExprTerms& terms, int pos, int keep=-1)
 {
     if (keep > 0)
-        assert(!m_terms[keep].isOp());      // unsupported
+        assert(!terms[keep].isOp());      // unsupported
     if (pos < 0)
-        pos += m_terms.size();
-    assert(pos >= 0 && pos < static_cast<int>(m_terms.size()));
+        pos += terms.size();
+    assert(pos >= 0 && pos < static_cast<int>(terms.size()));
 
-    ExprTerm& parent = m_terms[pos];
+    ExprTerm& parent = terms[pos];
     for (int n=pos-1; n >= 0; --n)
     {
-        ExprTerm& child = m_terms[n];
+        ExprTerm& child = terms[n];
         if (child.isEmpty())
             continue;
         if (child.m_depth <= parent.m_depth)
@@ -557,7 +566,7 @@ TransformNegImpl(Expr& e,
                     break;
                 }
 
-                if (llvm::APFloat* fltn = child->getFloat())
+                if (APFloat* fltn = child->getFloat())
                 {
                     fltn->changeSign();
                     break;
@@ -597,7 +606,7 @@ Expr::TransformNeg()
 }
 
 void
-Expr::LevelOp(Diagnostic& diags, bool simplify_reg_mul, int pos)
+Expr::LevelOp(DiagnosticsEngine& diags, bool simplify_reg_mul, int pos)
 {
     if (pos < 0)
         pos += m_terms.size();
@@ -723,7 +732,7 @@ again:
                 // This is special; it deletes all terms except for
                 // the integer.  This means we can terminate
                 // immediately after deleting all other terms.
-                ClearExcept(pos, n);
+                ClearExcept(m_terms, pos, n);
                 --child.m_depth;            // bring up intnum
                 root.Clear();               // delete operator
                 return;
@@ -750,7 +759,7 @@ again:
                 root.AddNumChild(-1);
             }
         }
-        else if (llvm::APFloat* fltn = child.getFloat())
+        else if (APFloat* fltn = child.getFloat())
         {
             //FIXME: Should the LNOT operator work with float?
             // currently can only handle 5 basic ops: +, -, *, /, %
@@ -779,8 +788,8 @@ again:
         else if (do_level && child.isOp(op))
         {
             root.AddNumChild(child.getNumChild() - 1);
-            ReduceDepth(n);         // bring up children
-            child.Clear();          // delete levelled op
+            ReduceDepth(m_terms, n);    // bring up children
+            child.Clear();              // delete levelled op
         }
     }
 
@@ -806,7 +815,7 @@ again:
         else if (!unary)
         {
             // delete one-term non-unary operators
-            ReduceDepth(pos);       // bring up children
+            ReduceDepth(m_terms, pos);  // bring up children
             root.Clear();
         }
     }
@@ -815,7 +824,7 @@ again:
 }
 
 void
-Expr::Simplify(Diagnostic& diags, bool simplify_reg_mul)
+Expr::Simplify(DiagnosticsEngine& diags, bool simplify_reg_mul)
 {
     TransformNeg();
 
@@ -874,51 +883,61 @@ Expr::Substitute(const ExprTerm* subst_begin, const ExprTerm* subst_end)
     return true;
 }
 
-Expr
-Expr::ExtractLHS(ExprTerms::reverse_iterator op)
+/// LHS expression extractor.
+/// @param e        expression
+/// @param pos      position of operator term to be extracted from
+static Expr
+ExtractLHS(Expr& e, int pos)
 {
-    Expr retval;
+    ExprTerms& terms = e.getTerms();
+    if (pos < 0)
+        pos += terms.size();
+    assert(pos >= 0 && pos < static_cast<int>(terms.size()));
 
-    ExprTerms::reverse_iterator end = m_terms.rend();
-    if (op == end)
+    Expr retval;
+    if (pos == 0)
         return retval;
 
+    ExprTerms& rvterms = retval.getTerms();
+
     // Delete the operator
-    int parent_depth = op->m_depth;
-    op->Clear();
+    int parent_depth = terms[pos].m_depth;
+    terms[pos].Clear();
 
     // Bring up the RHS terms
-    ExprTerms::reverse_iterator child = ++op;
-    for (; child != end; ++child)
+    int n = --pos;
+    for (; n >= 0; --n)
     {
-        if (child->isEmpty())
+        ExprTerm& child = terms[n];
+        if (child.isEmpty())
             continue;
-        if (child->m_depth <= parent_depth)
+        if (child.m_depth <= parent_depth)
             break;
-        if (child != op && child->m_depth == parent_depth+1)
+        if (n != pos && child.m_depth == parent_depth+1)
             break;      // stop when we've reached the second (LHS) child
-        child->m_depth--;
+        child.m_depth--;
     }
 
     // Extract the LHS terms.
-    for (; child != end; ++child)
+    for (; n >= 0; --n)
     {
-        if (child->isEmpty())
+        ExprTerm& child = terms[n];
+        if (child.isEmpty())
             continue;
-        if (child->m_depth <= parent_depth)
+        if (child.m_depth <= parent_depth)
             break;
         // Fix up depth for new expression.
-        child->m_depth -= parent_depth+1;
+        child.m_depth -= parent_depth+1;
         // Add a NONE term to retval, then swap it with the child.
-        retval.m_terms.push_back(ExprTerm());
-        std::swap(retval.m_terms.back(), *child);
+        rvterms.push_back(ExprTerm());
+        std::swap(rvterms.back(), child);
     }
 
     // We added in reverse order, so fix up.
-    std::reverse(retval.m_terms.begin(), retval.m_terms.end());
+    std::reverse(rvterms.begin(), rvterms.end());
 
     // Clean up NONE terms.
-    Cleanup();
+    e.Cleanup();
 
     return retval;
 }
@@ -927,11 +946,10 @@ Expr
 Expr::ExtractDeepSegOff()
 {
     // Look through terms for the first SEG:OFF operator
-    for (ExprTerms::reverse_iterator i = m_terms.rbegin(), end = m_terms.rend();
-         i != end; ++i)
+    for (int i = m_terms.size()-1; i >= 0; --i)
     {
-        if (i->isOp(Op::SEGOFF))
-            return ExtractLHS(i);
+        if (m_terms[i].isOp(Op::SEGOFF))
+            return ExtractLHS(*this, i);
     }
 
     return Expr();
@@ -944,7 +962,7 @@ Expr::ExtractSegOff()
     if (!m_terms.back().isOp(Op::SEGOFF))
         return Expr();
 
-    return ExtractLHS(m_terms.rbegin());
+    return ExtractLHS(*this, -1);
 }
 
 Expr
@@ -954,14 +972,14 @@ Expr::ExtractWRT()
     if (!m_terms.back().isOp(Op::WRT))
         return Expr();
 
-    Expr lhs = ExtractLHS(m_terms.rbegin());
+    Expr lhs = ExtractLHS(*this, -1);
 
     // need to keep LHS, and return RHS, so swap before returning.
     swap(lhs);
     return lhs;
 }
 
-llvm::APFloat*
+APFloat*
 Expr::getFloat() const
 {
     assert(isFloat() && "expression is not float");
@@ -999,7 +1017,7 @@ Expr::Write(pugi::xml_node out) const
         append_data(root, *i);
 
     // generate an easier to read version as an attribute
-    llvm::SmallString<128> ss;
+    SmallString<128> ss;
     llvm::raw_svector_ostream oss(ss);
     Print(oss);
     oss << '\0';
@@ -1010,7 +1028,7 @@ Expr::Write(pugi::xml_node out) const
 #endif // WITH_XML
 
 void
-ExprTerm::Print(llvm::raw_ostream& os, int base) const
+ExprTerm::Print(raw_ostream& os, int base) const
 {
     switch (m_type)
     {
@@ -1029,7 +1047,7 @@ ExprTerm::Print(llvm::raw_ostream& os, int base) const
 }
 
 static void
-Infix(llvm::raw_ostream& os, const Expr& e, int base, int pos=-1)
+Infix(raw_ostream& os, const Expr& e, int base, int pos=-1)
 {
     const char* opstr = "";
     const ExprTerms& terms = e.getTerms();
@@ -1092,7 +1110,7 @@ Infix(llvm::raw_ostream& os, const Expr& e, int base, int pos=-1)
         default:            opstr = " !UNK! "; break;
     }
 
-    typedef llvm::SmallVector<int, 32> CVector;
+    typedef SmallVector<int, 32> CVector;
     CVector children;
     const ExprTerm& root = terms[pos];
     --pos;
@@ -1131,7 +1149,7 @@ Infix(llvm::raw_ostream& os, const Expr& e, int base, int pos=-1)
 }
 
 void
-Expr::Print(llvm::raw_ostream& os, int base) const
+Expr::Print(raw_ostream& os, int base) const
 {
     Infix(os, *this, base);
 }

@@ -29,14 +29,14 @@
 /// POSSIBILITY OF SUCH DAMAGE.
 /// @endlicense
 ///
-#include "llvm/ADT/StringRef.h"
+#include "yasmx/Basic/LLVM.h"
 #include "yasmx/Config/export.h"
 
 
 namespace yasm
 {
 
-class Diagnostic;
+class DiagnosticsEngine;
 class DirectiveInfo;
 class ObjectFormat;
 
@@ -50,9 +50,9 @@ class ObjectFormat;
 /// @param diags        Diagnostic reporting
 YASM_LIB_EXPORT
 void DirIdentCommon(ObjectFormat& objfmt,
-                    llvm::StringRef sectname,
+                    StringRef sectname,
                     DirectiveInfo& info,
-                    Diagnostic& diags);
+                    DiagnosticsEngine& diags);
 
 } // namespace yasm
 

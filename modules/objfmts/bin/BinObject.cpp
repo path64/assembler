@@ -68,7 +68,7 @@ BinObject::~BinObject()
 void
 BinObject::OutputMap(const IntNum& origin,
                      const BinGroups& groups,
-                     Diagnostic& diags) const
+                     DiagnosticsEngine& diags) const
 {
     int map_flags = m_map_flags;
 
@@ -79,7 +79,7 @@ BinObject::OutputMap(const IntNum& origin,
         map_flags = MAP_BRIEF;          // default to brief
 
     std::string err;
-    llvm::raw_fd_ostream os
+    raw_fd_ostream os
         (m_map_filename.empty() ? "-" : m_map_filename.c_str(), err);
     if (!err.empty())
     {
@@ -106,7 +106,7 @@ namespace {
 class BinOutput : public BytecodeStreamOutput
 {
 public:
-    BinOutput(llvm::raw_fd_ostream& os, Object& object, Diagnostic& diags);
+    BinOutput(raw_fd_ostream& os, Object& object, DiagnosticsEngine& diags);
     ~BinOutput();
 
     void OutputSection(Section& sect, const IntNum& origin);
@@ -118,14 +118,14 @@ public:
 
 private:
     Object& m_object;
-    llvm::raw_fd_ostream& m_fd_os;
+    raw_fd_ostream& m_fd_os;
     BytecodeNoOutput m_no_output;
 };
 } // anonymous namespace
 
-BinOutput::BinOutput(llvm::raw_fd_ostream& os,
+BinOutput::BinOutput(raw_fd_ostream& os,
                      Object& object,
-                     Diagnostic& diags)
+                     DiagnosticsEngine& diags)
     : BytecodeStreamOutput(os, diags),
       m_object(object),
       m_fd_os(os),
@@ -229,7 +229,7 @@ done:
 }
 
 static void
-CheckSymbol(const Symbol& sym, Diagnostic& diags)
+CheckSymbol(const Symbol& sym, DiagnosticsEngine& diags)
 {
     int vis = sym.getVisibility();
 
@@ -256,10 +256,10 @@ CheckSymbol(const Symbol& sym, Diagnostic& diags)
 }
 
 void
-BinObject::Output(llvm::raw_fd_ostream& os,
+BinObject::Output(raw_fd_ostream& os,
                   bool all_syms,
                   DebugFormat& dbgfmt,
-                  Diagnostic& diags)
+                  DiagnosticsEngine& diags)
 {
     // Set ORG to 0 unless otherwise specified
     IntNum origin(0);
@@ -309,16 +309,17 @@ BinObject::Output(llvm::raw_fd_ostream& os,
 Section*
 BinObject::AddDefaultSection()
 {
-    Diagnostic diags(NULL);
+    IntrusiveRefCntPtr<DiagnosticIDs> diagids(new DiagnosticIDs);
+    DiagnosticsEngine diags(diagids);
     Section* section = AppendSection(".text", SourceLocation(), diags);
     section->setDefault(true);
     return section;
 }
 
 Section*
-BinObject::AppendSection(llvm::StringRef name,
+BinObject::AppendSection(StringRef name,
                          SourceLocation source,
-                         Diagnostic& diags)
+                         DiagnosticsEngine& diags)
 {
     bool bss = (name == ".bss");
     bool code = (name == ".text");
@@ -361,7 +362,7 @@ BinObject::AppendSection(llvm::StringRef name,
 }
 
 void
-BinObject::DirSection(DirectiveInfo& info, Diagnostic& diags)
+BinObject::DirSection(DirectiveInfo& info, DiagnosticsEngine& diags)
 {
     assert(info.isObject(m_object));
     NameValues& nvs = info.getNameValues();
@@ -374,7 +375,7 @@ BinObject::DirSection(DirectiveInfo& info, Diagnostic& diags)
                      diag::err_value_string_or_id);
         return;
     }
-    llvm::StringRef sectname = sectname_nv.getString();
+    StringRef sectname = sectname_nv.getString();
 
     Section* sect = m_object.FindSection(sectname);
     bool first = true;
@@ -446,14 +447,16 @@ BinObject::DirSection(DirectiveInfo& info, Diagnostic& diags)
 
     if (bsd->start.get() != 0 && !bsd->follows.empty())
     {
-        diags.Report(info.getSource(), diags.getCustomDiagID(Diagnostic::Error,
+        diags.Report(info.getSource(),
+                     diags.getCustomDiagID(DiagnosticsEngine::Error,
             "cannot combine '%0' and '%1' section attributes"))
             << "START" << "FOLLOWS";
     }
 
     if (bsd->vstart.get() != 0 && !bsd->vfollows.empty())
     {
-        diags.Report(info.getSource(), diags.getCustomDiagID(Diagnostic::Error,
+        diags.Report(info.getSource(),
+                     diags.getCustomDiagID(DiagnosticsEngine::Error,
             "cannot combine '%0' and '%1' section attributes"))
             << "VSTART" << "VFOLLOWS";
     }
@@ -463,13 +466,13 @@ BinObject::DirSection(DirectiveInfo& info, Diagnostic& diags)
 }
 
 void
-BinObject::DirOrg(DirectiveInfo& info, Diagnostic& diags)
+BinObject::DirOrg(DirectiveInfo& info, DiagnosticsEngine& diags)
 {
     // We only allow a single ORG in a program.
     if (m_org.get() != 0)
     {
         diags.Report(info.getSource(),
-            diags.getCustomDiagID(Diagnostic::Error,
+            diags.getCustomDiagID(DiagnosticsEngine::Error,
                                   "program origin redefined"));
         return;
     }
@@ -489,12 +492,12 @@ BinObject::DirOrg(DirectiveInfo& info, Diagnostic& diags)
 bool
 BinObject::setMapFilename(const NameValue& nv,
                           SourceLocation dir_source,
-                          Diagnostic& diags)
+                          DiagnosticsEngine& diags)
 {
     if (!m_map_filename.empty())
     {
         diags.Report(nv.getValueRange().getBegin(),
-            diags.getCustomDiagID(Diagnostic::Error,
+            diags.getCustomDiagID(DiagnosticsEngine::Error,
                                   "map file already specified"));
         return true;
     }
@@ -510,7 +513,7 @@ BinObject::setMapFilename(const NameValue& nv,
 }
 
 void
-BinObject::DirMap(DirectiveInfo& info, Diagnostic& diags)
+BinObject::DirMap(DirectiveInfo& info, DiagnosticsEngine& diags)
 {
     DirHelpers helpers;
     helpers.Add("all", false,
@@ -536,16 +539,16 @@ BinObject::DirMap(DirectiveInfo& info, Diagnostic& diags)
             TR1::bind(&BinObject::setMapFilename, this, _1, _2, _3));
 }
 
-std::vector<llvm::StringRef>
+std::vector<StringRef>
 BinObject::getDebugFormatKeywords()
 {
     static const char* keywords[] = {"null"};
     size_t keywords_size = sizeof(keywords)/sizeof(keywords[0]);
-    return std::vector<llvm::StringRef>(keywords, keywords+keywords_size);
+    return std::vector<StringRef>(keywords, keywords+keywords_size);
 }
 
 void
-BinObject::AddDirectives(Directives& dirs, llvm::StringRef parser)
+BinObject::AddDirectives(Directives& dirs, StringRef parser)
 {
     static const Directives::Init<BinObject> nasm_dirs[] =
     {

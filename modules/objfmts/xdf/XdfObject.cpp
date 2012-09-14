@@ -81,19 +81,19 @@ XdfObject::isOkObject(Object& object)
     return true;
 }
 
-std::vector<llvm::StringRef>
+std::vector<StringRef>
 XdfObject::getDebugFormatKeywords()
 {
     static const char* keywords[] = {"null"};
     size_t keywords_size = sizeof(keywords)/sizeof(keywords[0]);
-    return std::vector<llvm::StringRef>(keywords, keywords+keywords_size);
+    return std::vector<StringRef>(keywords, keywords+keywords_size);
 }
 
 namespace {
 class XdfOutput : public BytecodeStreamOutput
 {
 public:
-    XdfOutput(llvm::raw_ostream& os, Object& object, Diagnostic& diags);
+    XdfOutput(raw_ostream& os, Object& object, DiagnosticsEngine& diags);
     ~XdfOutput();
 
     void OutputSection(Section& sect);
@@ -112,7 +112,7 @@ private:
 };
 } // anonymous namespace
 
-XdfOutput::XdfOutput(llvm::raw_ostream& os, Object& object, Diagnostic& diags)
+XdfOutput::XdfOutput(raw_ostream& os, Object& object, DiagnosticsEngine& diags)
     : BytecodeStreamOutput(os, diags)
     , m_object(object)
     , m_no_output(diags)
@@ -304,10 +304,10 @@ XdfOutput::OutputSymbol(const Symbol& sym,
 }
 
 void
-XdfObject::Output(llvm::raw_fd_ostream& os,
+XdfObject::Output(raw_fd_ostream& os,
                   bool all_syms,
                   DebugFormat& dbgfmt,
-                  Diagnostic& diags)
+                  DiagnosticsEngine& diags)
 {
     all_syms = true;   // force all syms into symbol table
 
@@ -413,7 +413,7 @@ XdfObject::Output(llvm::raw_fd_ostream& os,
 }
 
 bool
-XdfObject::Taste(const llvm::MemoryBuffer& in,
+XdfObject::Taste(const MemoryBuffer& in,
                  /*@out@*/ std::string* arch_keyword,
                  /*@out@*/ std::string* machine)
 {
@@ -437,17 +437,17 @@ namespace {
 class ReadString
 {
 public:
-    ReadString(const llvm::MemoryBuffer& in,
+    ReadString(const MemoryBuffer& in,
                unsigned long strtab_offset,
                unsigned long strtab_len,
-               Diagnostic& diags)
+               DiagnosticsEngine& diags)
         : m_in(in)
         , m_offset(strtab_offset)
         , m_len(strtab_len)
         , m_diags(diags)
     {}
 
-    llvm::StringRef
+    StringRef
     operator() (unsigned long str_index)
     {
         if (str_index < m_offset || str_index >= m_offset+m_len)
@@ -459,17 +459,26 @@ public:
     }
 
 private:
-    const llvm::MemoryBuffer& m_in;
+    const MemoryBuffer& m_in;
     unsigned long m_offset;
     unsigned long m_len;
-    Diagnostic& m_diags;
+    DiagnosticsEngine& m_diags;
 };
 } // anonymous namespace
 
-bool
-XdfObject::Read(SourceManager& sm, Diagnostic& diags)
+static void
+NoAddSpan(Bytecode& bc,
+          int id,
+          const Value& value,
+          long neg_thres,
+          long pos_thres)
 {
-    const llvm::MemoryBuffer& in = *sm.getBuffer(sm.getMainFileID());
+}
+
+bool
+XdfObject::Read(SourceManager& sm, DiagnosticsEngine& diags)
+{
+    const MemoryBuffer& in = *sm.getBuffer(sm.getMainFileID());
     InputBuffer inbuf(in);
     inbuf.setLittleEndian();
 
@@ -522,7 +531,7 @@ XdfObject::Read(SourceManager& sm, Diagnostic& diags)
 
         // get section name from section symbol entry
         inbuf.setPosition(symtab_offset+name_sym_index*SYMBOL_SIZE+8);
-        llvm::StringRef sectname = read_string(ReadU32(inbuf));
+        StringRef sectname = read_string(ReadU32(inbuf));
 
         std::auto_ptr<Section> section(
             new Section(sectname, xsect->bits != 0, bss, SourceLocation()));
@@ -535,8 +544,9 @@ XdfObject::Read(SourceManager& sm, Diagnostic& diags)
         {
             Bytecode& gap =
                 section->AppendGap(xsect->size, SourceLocation());
-            Diagnostic nodiags(0);
-            gap.CalcLen(0, nodiags);    // force length calculation of gap
+            IntrusiveRefCntPtr<DiagnosticIDs> diagids(new DiagnosticIDs);
+            DiagnosticsEngine nodiags(diagids);
+            gap.CalcLen(NoAddSpan, nodiags); // force length calculation
         }
         else
         {
@@ -549,8 +559,8 @@ XdfObject::Read(SourceManager& sm, Diagnostic& diags)
                 return false;
             }
 
-            section->bytecodes_front().getFixed().Write(inbuf.Read(xsect->size),
-                                                        xsect->size);
+            section->bytecodes_front().getFixed()
+                .Write(inbuf.Read(xsect->size));
         }
 
         // Associate section data with section
@@ -568,7 +578,7 @@ XdfObject::Read(SourceManager& sm, Diagnostic& diags)
     {
         unsigned long sym_scnum = ReadU32(inbuf);           // section number
         unsigned long value = ReadU32(inbuf);               // value
-        llvm::StringRef symname = read_string(ReadU32(inbuf));// name
+        StringRef symname = read_string(ReadU32(inbuf));    // name
         unsigned long flags = ReadU32(inbuf);               // flags
 
         SymbolRef sym = m_object.getSymbol(symname);
@@ -632,16 +642,17 @@ XdfObject::Read(SourceManager& sm, Diagnostic& diags)
 Section*
 XdfObject::AddDefaultSection()
 {
-    Diagnostic diags(NULL);
+    IntrusiveRefCntPtr<DiagnosticIDs> diagids(new DiagnosticIDs);
+    DiagnosticsEngine diags(diagids);
     Section* section = AppendSection(".text", SourceLocation(), diags);
     section->setDefault(true);
     return section;
 }
 
 Section*
-XdfObject::AppendSection(llvm::StringRef name,
+XdfObject::AppendSection(StringRef name,
                          SourceLocation source,
-                         Diagnostic& diags)
+                         DiagnosticsEngine& diags)
 {
     bool code = (name == ".text");
     Section* section = new Section(name, code, false, source);
@@ -664,7 +675,7 @@ XdfObject::AppendSection(llvm::StringRef name,
 }
 
 void
-XdfObject::DirSection(DirectiveInfo& info, Diagnostic& diags)
+XdfObject::DirSection(DirectiveInfo& info, DiagnosticsEngine& diags)
 {
     assert(info.isObject(m_object));
     NameValues& nvs = info.getNameValues();
@@ -676,7 +687,7 @@ XdfObject::DirSection(DirectiveInfo& info, Diagnostic& diags)
                      diag::err_value_string_or_id);
         return;
     }
-    llvm::StringRef sectname = sectname_nv.getString();
+    StringRef sectname = sectname_nv.getString();
 
     Section* sect = m_object.FindSection(sectname);
     bool first = true;
@@ -750,7 +761,7 @@ XdfObject::DirSection(DirectiveInfo& info, Diagnostic& diags)
         if (aligni > 4096)
         {
             diags.Report(info.getSource(),
-                diags.getCustomDiagID(Diagnostic::Error,
+                diags.getCustomDiagID(DiagnosticsEngine::Error,
                     "XDF does not support alignments > 4096"));
         }
 
@@ -767,7 +778,7 @@ XdfObject::DirSection(DirectiveInfo& info, Diagnostic& diags)
 }
 
 void
-XdfObject::AddDirectives(Directives& dirs, llvm::StringRef parser)
+XdfObject::AddDirectives(Directives& dirs, StringRef parser)
 {
     static const Directives::Init<XdfObject> nasm_dirs[] =
     {

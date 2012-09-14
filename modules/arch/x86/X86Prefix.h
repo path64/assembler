@@ -44,12 +44,13 @@ public:
         ADDRSIZE = 2<<8,
         OPERSIZE = 3<<8,
         SEGREG = 4<<8,
-        REX = 5<<8
+        REX = 5<<8,
+        ACQREL = 6<<8       // TSX hint prefixes
     };
 
     X86Prefix(Type type, unsigned char value);
     ~X86Prefix();
-    void Put(llvm::raw_ostream& os) const;
+    void Put(raw_ostream& os) const;
 #ifdef WITH_XML
     pugi::xml_node Write(pugi::xml_node out) const;
 #endif // WITH_XML

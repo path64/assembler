@@ -38,7 +38,7 @@
 namespace yasm
 {
 
-class Diagnostic;
+class DiagnosticsEngine;
 class DirectiveInfo;
 class Object;
 
@@ -137,7 +137,14 @@ public:
         CPU_RDRAND,         // Intel RDRAND instruction
         CPU_XSAVEOPT,       // Intel XSAVEOPT instruction
         CPU_EPTVPID,        // Intel INVEPT, INVVPID instructions
-        CPU_SMX             // Intel SMX instruction (GETSEC)
+        CPU_SMX,            // Intel SMX instruction (GETSEC)
+        CPU_AVX2,           // Intel AVX2 instructions
+        CPU_BMI1,           // Intel BMI1 instructions
+        CPU_BMI2,           // Intel BMI2 instructions
+        CPU_INVPCID,        // Intel INVPCID instruction
+        CPU_LZCNT,          // Intel LZCNT instruction
+        CPU_TBM,            // AMD TBM instruction
+        CPU_TSX             // Intel TSX instructions
     };
     typedef std::bitset<64> CpuMask;
 
@@ -161,21 +168,21 @@ public:
     /// Destructor.
     ~X86Arch();
 
-    void AddDirectives(Directives& dir, llvm::StringRef parser);
+    void AddDirectives(Directives& dir, StringRef parser);
 
-    bool setParser(llvm::StringRef parser);
-    bool setMachine(llvm::StringRef machine);
-    llvm::StringRef getMachine() const;
+    bool setParser(StringRef parser);
+    bool setMachine(StringRef machine);
+    StringRef getMachine() const;
     unsigned int getAddressSize() const;
 
-    bool setVar(llvm::StringRef var, unsigned long val);
+    bool setVar(StringRef var, unsigned long val);
 
-    InsnPrefix ParseCheckInsnPrefix(llvm::StringRef id,
+    InsnPrefix ParseCheckInsnPrefix(StringRef id,
                                     SourceLocation source,
-                                    Diagnostic& diags) const;
-    RegTmod ParseCheckRegTmod(llvm::StringRef id,
+                                    DiagnosticsEngine& diags) const;
+    RegTmod ParseCheckRegTmod(StringRef id,
                               SourceLocation source,
-                              Diagnostic& diags) const;
+                              DiagnosticsEngine& diags) const;
 
     const unsigned char** getFill() const;
 
@@ -199,15 +206,15 @@ public:
 
 private:
     // Returns false if cpuid not recognized
-    bool ParseCpu(llvm::StringRef cpuid);
+    bool ParseCpu(StringRef cpuid);
 
     // Directives
-    void DirCpu(DirectiveInfo& info, Diagnostic& diags);
-    void DirBits(DirectiveInfo& info, Diagnostic& diags);
-    void DirCode16(DirectiveInfo& info, Diagnostic& diags);
-    void DirCode32(DirectiveInfo& info, Diagnostic& diags);
-    void DirCode64(DirectiveInfo& info, Diagnostic& diags);
-    void DirDefault(DirectiveInfo& info, Diagnostic& diags);
+    void DirCpu(DirectiveInfo& info, DiagnosticsEngine& diags);
+    void DirBits(DirectiveInfo& info, DiagnosticsEngine& diags);
+    void DirCode16(DirectiveInfo& info, DiagnosticsEngine& diags);
+    void DirCode32(DirectiveInfo& info, DiagnosticsEngine& diags);
+    void DirCode64(DirectiveInfo& info, DiagnosticsEngine& diags);
+    void DirDefault(DirectiveInfo& info, DiagnosticsEngine& diags);
 
     // What instructions/features are enabled?
     CpuMask m_active_cpu;

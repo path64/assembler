@@ -33,6 +33,7 @@
 #include <vector>
 
 #include "llvm/ADT/SmallVector.h"
+#include "yasmx/Basic/LLVM.h"
 #include "yasmx/Basic/SourceLocation.h"
 #include "yasmx/Config/export.h"
 #include "yasmx/DebugDumper.h"
@@ -45,7 +46,7 @@ namespace yasm
 
 class BytecodeContainer;
 class Bytes;
-class Diagnostic;
+class DiagnosticsEngine;
 class Register;
 class SegmentRegister;
 
@@ -55,7 +56,7 @@ class YASM_LIB_EXPORT TargetModifier
 public:
     TargetModifier() {}
     virtual ~TargetModifier();
-    virtual void Put(llvm::raw_ostream& os) const = 0;
+    virtual void Put(raw_ostream& os) const = 0;
 
 #ifdef WITH_XML
     /// Write an XML representation.  For debugging purposes.
@@ -128,7 +129,7 @@ public:
     /// expression trees.
     void Destroy();
 
-    bool Finalize(Diagnostic& diags);
+    bool Finalize(DiagnosticsEngine& diags);
 
     /// Match type.
     bool isType(Type type) const
@@ -263,7 +264,7 @@ class YASM_LIB_EXPORT Prefix
 public:
     Prefix() {}
     virtual ~Prefix();
-    virtual void Put(llvm::raw_ostream& os) const = 0;
+    virtual void Put(raw_ostream& os) const = 0;
 
 #ifdef WITH_XML
     /// Write an XML representation.  For debugging purposes.
@@ -284,7 +285,7 @@ class YASM_LIB_EXPORT Insn
 public:
     typedef std::auto_ptr<Insn> Ptr;
 
-    typedef llvm::SmallVector<Operand, 3> Operands;
+    typedef SmallVector<Operand, 3> Operands;
     typedef std::vector<std::pair<const Prefix*, SourceLocation> > Prefixes;
 
     Insn();
@@ -325,7 +326,7 @@ public:
     /// Append instruction to a bytecode container.
     bool Append(BytecodeContainer& container,
                 SourceLocation source,
-                Diagnostic& diags);
+                DiagnosticsEngine& diags);
 
     virtual Insn* clone() const = 0;
 
@@ -343,7 +344,7 @@ protected:
     /// Append instruction to a section.
     virtual bool DoAppend(BytecodeContainer& container,
                           SourceLocation source,
-                          Diagnostic& diags) = 0;
+                          DiagnosticsEngine& diags) = 0;
 
 #ifdef WITH_XML
     /// Write derived class XML representation.  For debugging purposes.
@@ -366,15 +367,15 @@ private:
     const Insn& operator=(const Insn&);
 };
 
-inline llvm::raw_ostream&
-operator<< (llvm::raw_ostream& os, const TargetModifier& tmod)
+inline raw_ostream&
+operator<< (raw_ostream& os, const TargetModifier& tmod)
 {
     tmod.Put(os);
     return os;
 }
 
-inline llvm::raw_ostream&
-operator<< (llvm::raw_ostream& os, const Prefix& prefix)
+inline raw_ostream&
+operator<< (raw_ostream& os, const Prefix& prefix)
 {
     prefix.Put(os);
     return os;

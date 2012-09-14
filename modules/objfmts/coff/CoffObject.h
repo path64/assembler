@@ -32,7 +32,7 @@
 namespace yasm
 {
 
-class Diagnostic;
+class DiagnosticsEngine;
 class DirectiveInfo;
 class DirHelpers;
 class IntNum;
@@ -60,35 +60,35 @@ public:
                bool win64 = false);
     virtual ~CoffObject();
 
-    virtual void AddDirectives(Directives& dirs, llvm::StringRef parser);
+    virtual void AddDirectives(Directives& dirs, StringRef parser);
 
-    virtual void InitSymbols(llvm::StringRef parser);
+    virtual void InitSymbols(StringRef parser);
 #if 0
     virtual void read(std::istream& is);
 #endif
-    virtual void Output(llvm::raw_fd_ostream& os,
+    virtual void Output(raw_fd_ostream& os,
                         bool all_syms,
                         DebugFormat& dbgfmt,
-                        Diagnostic& diags);
+                        DiagnosticsEngine& diags);
 
     virtual Section* AddDefaultSection();
-    virtual Section* AppendSection(llvm::StringRef name,
+    virtual Section* AppendSection(StringRef name,
                                    SourceLocation source,
-                                   Diagnostic& diags);
+                                   DiagnosticsEngine& diags);
 
     Machine getMachine() const { return m_machine; }
 
     bool isWin32() const { return m_win32; }
     bool isWin64() const { return m_win64; }
 
-    static llvm::StringRef getName() { return "COFF (DJGPP)"; }
-    static llvm::StringRef getKeyword() { return "coff"; }
-    static llvm::StringRef getExtension() { return ".o"; }
+    static StringRef getName() { return "COFF (DJGPP)"; }
+    static StringRef getKeyword() { return "coff"; }
+    static StringRef getExtension() { return ".o"; }
     static unsigned int getDefaultX86ModeBits() { return 32; }
-    static llvm::StringRef getDefaultDebugFormatKeyword() { return "null"; }
-    static std::vector<llvm::StringRef> getDebugFormatKeywords();
+    static StringRef getDefaultDebugFormatKeyword() { return "null"; }
+    static std::vector<StringRef> getDebugFormatKeywords();
     static bool isOkObject(Object& object);
-    static bool Taste(const llvm::MemoryBuffer& in,
+    static bool Taste(const MemoryBuffer& in,
                       /*@out@*/ std::string* arch_keyword,
                       /*@out@*/ std::string* machine)
     { return false; }
@@ -96,11 +96,11 @@ public:
 protected:
     /// Initialize section (and COFF data) based on section name.
     /// @return True if section name recognized, false otherwise.
-    virtual bool InitSection(llvm::StringRef name,
+    virtual bool InitSection(StringRef name,
                              Section& section,
                              CoffSection* coffsect,
                              SourceLocation source,
-                             Diagnostic& diags);
+                             DiagnosticsEngine& diags);
     virtual void DirSectionInitHelpers(DirHelpers& helpers,
                                        CoffSection* csd,
                                        IntNum* align,
@@ -130,14 +130,14 @@ private:
 
     CoffSymbol* m_def_sym;          // Data for symbol specified by .def dir
 
-    void DirGasSection(DirectiveInfo& info, Diagnostic& diags);
-    void DirSection(DirectiveInfo& info, Diagnostic& diags);
-    void DirIdent(DirectiveInfo& info, Diagnostic& diags);
-    void DirGasDef(DirectiveInfo& info, Diagnostic& diags);
-    void DirGasScl(DirectiveInfo& info, Diagnostic& diags);
-    void DirGasType(DirectiveInfo& info, Diagnostic& diags);
-    void DirGasEndef(DirectiveInfo& info, Diagnostic& diags);
-    void DirSecRel32(DirectiveInfo& info, Diagnostic& diags);
+    void DirGasSection(DirectiveInfo& info, DiagnosticsEngine& diags);
+    void DirSection(DirectiveInfo& info, DiagnosticsEngine& diags);
+    void DirIdent(DirectiveInfo& info, DiagnosticsEngine& diags);
+    void DirGasDef(DirectiveInfo& info, DiagnosticsEngine& diags);
+    void DirGasScl(DirectiveInfo& info, DiagnosticsEngine& diags);
+    void DirGasType(DirectiveInfo& info, DiagnosticsEngine& diags);
+    void DirGasEndef(DirectiveInfo& info, DiagnosticsEngine& diags);
+    void DirSecRel32(DirectiveInfo& info, DiagnosticsEngine& diags);
 };
 
 }} // namespace yasm::objfmt

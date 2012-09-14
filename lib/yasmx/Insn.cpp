@@ -148,7 +148,7 @@ Operand::clone() const
 }
 
 bool
-Operand::Finalize(Diagnostic& diags)
+Operand::Finalize(DiagnosticsEngine& diags)
 {
     switch (m_type)
     {
@@ -292,7 +292,7 @@ Insn::~Insn()
 bool
 Insn::Append(BytecodeContainer& container,
              SourceLocation source,
-             Diagnostic& diags)
+             DiagnosticsEngine& diags)
 {
     // Simplify the operands' expressions.
     bool ok = true;

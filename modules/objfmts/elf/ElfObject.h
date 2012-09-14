@@ -52,7 +52,7 @@
 
 namespace yasm
 {
-class Diagnostic;
+class DiagnosticsEngine;
 class DirectiveInfo;
 
 namespace objfmt
@@ -72,10 +72,7 @@ public:
         Auto        // name@@@node in gas syntax (automatic std/default)
     };
 
-    ElfSymVersion(llvm::StringRef real,
-                  llvm::StringRef name,
-                  llvm::StringRef version,
-                  Mode mode)
+    ElfSymVersion(StringRef real, StringRef name, StringRef version, Mode mode)
         : m_real(real)
         , m_name(name)
         , m_version(version)
@@ -110,58 +107,58 @@ public:
               unsigned int bits=0);
     ~ElfObject();
 
-    static llvm::StringRef getName() { return "ELF"; }
-    static llvm::StringRef getKeyword() { return "elf"; }
-    static llvm::StringRef getExtension() { return ".o"; }
+    static StringRef getName() { return "ELF"; }
+    static StringRef getKeyword() { return "elf"; }
+    static StringRef getExtension() { return ".o"; }
     static unsigned int getDefaultX86ModeBits() { return 0; }
-    static llvm::StringRef getDefaultDebugFormatKeyword() { return "cfi"; }
-    static std::vector<llvm::StringRef> getDebugFormatKeywords();
+    static StringRef getDefaultDebugFormatKeyword() { return "cfi"; }
+    static std::vector<StringRef> getDebugFormatKeywords();
     static bool isOkObject(Object& object) { return true; }
-    static bool Taste(const llvm::MemoryBuffer& in,
+    static bool Taste(const MemoryBuffer& in,
                       /*@out@*/ std::string* arch_keyword,
                       /*@out@*/ std::string* machine)
     { return false; }
 
-    void AddDirectives(Directives& dirs, llvm::StringRef parser);
+    void AddDirectives(Directives& dirs, StringRef parser);
 
-    void InitSymbols(llvm::StringRef parser);
+    void InitSymbols(StringRef parser);
 
-    bool Read(SourceManager& sm, Diagnostic& diags);
-    void Output(llvm::raw_fd_ostream& os,
+    bool Read(SourceManager& sm, DiagnosticsEngine& diags);
+    void Output(raw_fd_ostream& os,
                 bool all_syms,
                 DebugFormat& dbgfmt,
-                Diagnostic& diags);
+                DiagnosticsEngine& diags);
 
     Section* AddDefaultSection();
-    Section* AppendSection(llvm::StringRef name,
+    Section* AppendSection(StringRef name,
                            SourceLocation source,
-                           Diagnostic& diags);
+                           DiagnosticsEngine& diags);
 
     ElfSymbol& BuildSymbol(Symbol& sym);
-    void BuildExtern(Symbol& sym, Diagnostic& diags);
-    void BuildGlobal(Symbol& sym, Diagnostic& diags);
-    void BuildCommon(Symbol& sym, Diagnostic& diags);
+    void BuildExtern(Symbol& sym, DiagnosticsEngine& diags);
+    void BuildGlobal(Symbol& sym, DiagnosticsEngine& diags);
+    void BuildCommon(Symbol& sym, DiagnosticsEngine& diags);
     void setSymbolSectionValue(Symbol& sym, ElfSymbol& elfsym);
     void FinalizeSymbol(Symbol& sym,
                         StringTable& strtab,
                         bool local_names,
-                        Diagnostic& diags);
+                        DiagnosticsEngine& diags);
 
-    void DirGasSection(DirectiveInfo& info, Diagnostic& diags);
-    void DirSection(DirectiveInfo& info, Diagnostic& diags);
-    void DirType(DirectiveInfo& info, Diagnostic& diags);
-    void DirSize(DirectiveInfo& info, Diagnostic& diags);
-    void DirWeak(DirectiveInfo& info, Diagnostic& diags);
-    void DirWeakRef(DirectiveInfo& info, Diagnostic& diags);
+    void DirGasSection(DirectiveInfo& info, DiagnosticsEngine& diags);
+    void DirSection(DirectiveInfo& info, DiagnosticsEngine& diags);
+    void DirType(DirectiveInfo& info, DiagnosticsEngine& diags);
+    void DirSize(DirectiveInfo& info, DiagnosticsEngine& diags);
+    void DirWeak(DirectiveInfo& info, DiagnosticsEngine& diags);
+    void DirWeakRef(DirectiveInfo& info, DiagnosticsEngine& diags);
     void VisibilityDir(DirectiveInfo& info,
-                       Diagnostic& diags,
+                       DiagnosticsEngine& diags,
                        ElfSymbolVis vis);
-    void DirInternal(DirectiveInfo& info, Diagnostic& diags);
-    void DirHidden(DirectiveInfo& info, Diagnostic& diags);
-    void DirProtected(DirectiveInfo& info, Diagnostic& diags);
-    void DirSymVer(DirectiveInfo& info, Diagnostic& diags);
-    void DirIdent(DirectiveInfo& info, Diagnostic& diags);
-    void DirVersion(DirectiveInfo& info, Diagnostic& diags);
+    void DirInternal(DirectiveInfo& info, DiagnosticsEngine& diags);
+    void DirHidden(DirectiveInfo& info, DiagnosticsEngine& diags);
+    void DirProtected(DirectiveInfo& info, DiagnosticsEngine& diags);
+    void DirSymVer(DirectiveInfo& info, DiagnosticsEngine& diags);
+    void DirIdent(DirectiveInfo& info, DiagnosticsEngine& diags);
+    void DirVersion(DirectiveInfo& info, DiagnosticsEngine& diags);
 
     ElfConfig m_config;                     // ELF configuration
     util::scoped_ptr<ElfMachine> m_machine; // ELF machine interface
@@ -188,20 +185,20 @@ public:
     {}
     ~Elf32Object();
 
-    static llvm::StringRef getName() { return "ELF (32-bit)"; }
-    static llvm::StringRef getKeyword() { return "elf32"; }
-    static llvm::StringRef getExtension() { return ElfObject::getExtension(); }
+    static StringRef getName() { return "ELF (32-bit)"; }
+    static StringRef getKeyword() { return "elf32"; }
+    static StringRef getExtension() { return ElfObject::getExtension(); }
     static unsigned int getDefaultX86ModeBits() { return 32; }
 
-    static llvm::StringRef getDefaultDebugFormatKeyword()
+    static StringRef getDefaultDebugFormatKeyword()
     { return ElfObject::getDefaultDebugFormatKeyword(); }
-    static std::vector<llvm::StringRef> getDebugFormatKeywords()
+    static std::vector<StringRef> getDebugFormatKeywords()
     { return ElfObject::getDebugFormatKeywords(); }
 
     static bool isOkObject(Object& object);
 
     // For tasting, let main elf handle it.
-    static bool Taste(const llvm::MemoryBuffer& in,
+    static bool Taste(const MemoryBuffer& in,
                       /*@out@*/ std::string* arch_keyword,
                       /*@out@*/ std::string* machine);
 };
@@ -214,20 +211,46 @@ public:
     {}
     ~Elf64Object();
 
-    static llvm::StringRef getName() { return "ELF (64-bit)"; }
-    static llvm::StringRef getKeyword() { return "elf64"; }
-    static llvm::StringRef getExtension() { return ElfObject::getExtension(); }
+    static StringRef getName() { return "ELF (64-bit)"; }
+    static StringRef getKeyword() { return "elf64"; }
+    static StringRef getExtension() { return ElfObject::getExtension(); }
     static unsigned int getDefaultX86ModeBits() { return 64; }
 
-    static llvm::StringRef getDefaultDebugFormatKeyword()
+    static StringRef getDefaultDebugFormatKeyword()
     { return ElfObject::getDefaultDebugFormatKeyword(); }
-    static std::vector<llvm::StringRef> getDebugFormatKeywords()
+    static std::vector<StringRef> getDebugFormatKeywords()
     { return ElfObject::getDebugFormatKeywords(); }
 
     static bool isOkObject(Object& object);
 
     // For tasting, let main elf handle it.
-    static bool Taste(const llvm::MemoryBuffer& in,
+    static bool Taste(const MemoryBuffer& in,
+                      /*@out@*/ std::string* arch_keyword,
+                      /*@out@*/ std::string* machine);
+};
+
+class YASM_STD_EXPORT Elfx32Object : public ElfObject
+{
+public:
+    Elfx32Object(const ObjectFormatModule& module, Object& object)
+        : ElfObject(module, object, 32)
+    {}
+    ~Elfx32Object();
+
+    static StringRef getName() { return "ELF (x32)"; }
+    static StringRef getKeyword() { return "elfx32"; }
+    static StringRef getExtension() { return ElfObject::getExtension(); }
+    static unsigned int getDefaultX86ModeBits() { return 64; }
+
+    static StringRef getDefaultDebugFormatKeyword()
+    { return ElfObject::getDefaultDebugFormatKeyword(); }
+    static std::vector<StringRef> getDebugFormatKeywords()
+    { return ElfObject::getDebugFormatKeywords(); }
+
+    static bool isOkObject(Object& object);
+
+    // For tasting, let main elf handle it.
+    static bool Taste(const MemoryBuffer& in,
                       /*@out@*/ std::string* arch_keyword,
                       /*@out@*/ std::string* machine);
 };

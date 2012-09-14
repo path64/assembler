@@ -33,6 +33,7 @@
 #include <memory>
 #include <vector>
 
+#include "yasmx/Basic/LLVM.h"
 #include "yasmx/Basic/SourceLocation.h"
 #include "yasmx/Config/export.h"
 #include "yasmx/Config/functional.h"
@@ -48,7 +49,7 @@ namespace yasm
 
 class BytecodeContainer;
 class BytecodeOutput;
-class Diagnostic;
+class DiagnosticsEngine;
 class Expr;
 
 /// A bytecode.
@@ -96,7 +97,7 @@ public:
         /// @param bc           bytecode
         /// @param diags        diagnostic reporting
         /// @return False if an error occurred.
-        virtual bool Finalize(Bytecode& bc, Diagnostic& diags) = 0;
+        virtual bool Finalize(Bytecode& bc, DiagnosticsEngine& diags) = 0;
 
         /// Calculates the minimum size of a bytecode.
         /// Called from Bytecode::CalcLen().
@@ -110,7 +111,7 @@ public:
         virtual bool CalcLen(Bytecode& bc,
                              /*@out@*/ unsigned long* len,
                              const Bytecode::AddSpanFunc& add_span,
-                             Diagnostic& diags)
+                             DiagnosticsEngine& diags)
             = 0;
 
         /// Recalculates the bytecode's length based on an expanded span
@@ -143,7 +144,7 @@ public:
                             bool* keep,
                             /*@out@*/ long* neg_thres,
                             /*@out@*/ long* pos_thres,
-                            Diagnostic& diags);
+                            DiagnosticsEngine& diags);
 
         /// Output a bytecode.
         /// Called from Bytecode::Output().
@@ -172,7 +173,7 @@ public:
 
         /// Get the type name of the bytecode contents.
         /// Implementations should return a known unique identifying name.
-        virtual llvm::StringRef getType() const = 0;
+        virtual StringRef getType() const = 0;
 
         virtual Contents* clone() const = 0;
 
@@ -236,7 +237,7 @@ public:
     /// Finalize a bytecode after parsing.
     /// @param diags        diagnostic reporting
     /// @return False if an error occurred.
-    bool Finalize(Diagnostic& diags);
+    bool Finalize(DiagnosticsEngine& diags);
 
     /// Get the offset of the bytecode.
     /// @return Offset of the bytecode in bytes.
@@ -282,7 +283,7 @@ public:
     /// @param diags        diagnostic reporting
     /// @return False if an error occurred.
     /// @note May store to bytecode updated expressions and the short length.
-    bool CalcLen(const AddSpanFunc& add_span, Diagnostic& diags);
+    bool CalcLen(const AddSpanFunc& add_span, DiagnosticsEngine& diags);
 
     /// Recalculate a bytecode's length based on an expanded span length.
     /// @param span         span ID (as given to add_span in CalcLen())
@@ -304,7 +305,7 @@ public:
                 bool* keep,
                 /*@out@*/ long* neg_thres,
                 /*@out@*/ long* pos_thres,
-                Diagnostic& diags);
+                DiagnosticsEngine& diags);
 
     /// Output a bytecode.
     /// @param bc_out       bytecode output interface
@@ -320,7 +321,8 @@ public:
     /// @param offset       offset to set this bytecode to
     /// @param diags        diagnostic reporting
     /// @return Offset of next bytecode.
-    unsigned long UpdateOffset(unsigned long offset, Diagnostic& diags);
+    unsigned long UpdateOffset(unsigned long offset,
+                               DiagnosticsEngine& diags);
 
     SourceLocation getSource() const { return m_source; }
 

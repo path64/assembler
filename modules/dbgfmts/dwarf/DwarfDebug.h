@@ -55,12 +55,14 @@ public:
     DwarfDebug(const DebugFormatModule& module, Object& object);
     ~DwarfDebug();
 
-    static llvm::StringRef getName() { return "DWARF debugging format"; }
-    static llvm::StringRef getKeyword() { return "dwarf"; }
+    static StringRef getName() { return "DWARF debugging format"; }
+    static StringRef getKeyword() { return "dwarf"; }
     static bool isOkObject(Object& object) { return true; }
 
-    void AddDirectives(Directives& dirs, llvm::StringRef parser);
-    void Generate(ObjectFormat& objfmt, SourceManager& smgr, Diagnostic& diags);
+    void AddDirectives(Directives& dirs, StringRef parser);
+    void Generate(ObjectFormat& objfmt,
+                  SourceManager& smgr,
+                  DiagnosticsEngine& diags);
 
     struct Filename
     {
@@ -76,15 +78,15 @@ public:
     bool gotFile() { return !m_filenames.empty(); }
 
 protected:
-    void AddCfiDirectives(Directives& dirs, llvm::StringRef parser);
+    void AddCfiDirectives(Directives& dirs, StringRef parser);
     void GenerateCfi(ObjectFormat& objfmt,
                      SourceManager& smgr,
-                     Diagnostic& diags);
+                     DiagnosticsEngine& diags);
 
-    void AddDebugDirectives(Directives& dirs, llvm::StringRef parser);
+    void AddDebugDirectives(Directives& dirs, StringRef parser);
     void GenerateDebug(ObjectFormat& objfmt,
                        SourceManager& smgr,
-                       Diagnostic& diags);
+                       DiagnosticsEngine& diags);
 
 private:
     friend class DwarfCfiCie;
@@ -92,7 +94,7 @@ private:
     friend class DwarfCfiInsn;
 
     ObjectFormat* m_objfmt;
-    Diagnostic* m_diags;
+    DiagnosticsEngine* m_diags;
 
     typedef std::vector<std::string> Dirs;
     Dirs m_dirs;
@@ -135,37 +137,39 @@ private:
     void InitCfi(Arch& arch);
 
     // Line number directives
-    void DirLoc(DirectiveInfo& info, Diagnostic& diags);
-    void DirFile(DirectiveInfo& info, Diagnostic& diags);
+    void DirLoc(DirectiveInfo& info, DiagnosticsEngine& diags);
+    void DirFile(DirectiveInfo& info, DiagnosticsEngine& diags);
 
     // CFI directives
-    void DirCfiStartproc(DirectiveInfo& info, Diagnostic& diags);
-    void DirCfiEndproc(DirectiveInfo& info, Diagnostic& diags);
-    void DirCfiSections(DirectiveInfo& info, Diagnostic& diags);
-    void DirCfiPersonality(DirectiveInfo& info, Diagnostic& diags);
-    void DirCfiLsda(DirectiveInfo& info, Diagnostic& diags);
-    void DirCfiDefCfa(DirectiveInfo& info, Diagnostic& diags);
-    void DirCfiDefCfaRegister(DirectiveInfo& info, Diagnostic& diags);
-    void DirCfiDefCfaOffset(DirectiveInfo& info, Diagnostic& diags);
-    void DirCfiAdjustCfaOffset(DirectiveInfo& info, Diagnostic& diags);
-    void DirCfiOffset(DirectiveInfo& info, Diagnostic& diags);
-    void DirCfiRelOffset(DirectiveInfo& info, Diagnostic& diags);
-    void DirCfiRegister(DirectiveInfo& info, Diagnostic& diags);
-    void DirCfiRestore(DirectiveInfo& info, Diagnostic& diags);
-    void DirCfiUndefined(DirectiveInfo& info, Diagnostic& diags);
-    void DirCfiSameValue(DirectiveInfo& info, Diagnostic& diags);
-    void DirCfiRememberState(DirectiveInfo& info, Diagnostic& diags);
-    void DirCfiRestoreState(DirectiveInfo& info, Diagnostic& diags);
-    void DirCfiReturnColumn(DirectiveInfo& info, Diagnostic& diags);
-    void DirCfiSignalFrame(DirectiveInfo& info, Diagnostic& diags);
-    void DirCfiWindowSave(DirectiveInfo& info, Diagnostic& diags);
-    void DirCfiEscape(DirectiveInfo& info, Diagnostic& diags);
-    void DirCfiValEncodedAddr(DirectiveInfo& info, Diagnostic& diags);
+    void DirCfiStartproc(DirectiveInfo& info, DiagnosticsEngine& diags);
+    void DirCfiEndproc(DirectiveInfo& info, DiagnosticsEngine& diags);
+    void DirCfiSections(DirectiveInfo& info, DiagnosticsEngine& diags);
+    void DirCfiPersonality(DirectiveInfo& info, DiagnosticsEngine& diags);
+    void DirCfiLsda(DirectiveInfo& info, DiagnosticsEngine& diags);
+    void DirCfiDefCfa(DirectiveInfo& info, DiagnosticsEngine& diags);
+    void DirCfiDefCfaRegister(DirectiveInfo& info, DiagnosticsEngine& diags);
+    void DirCfiDefCfaOffset(DirectiveInfo& info, DiagnosticsEngine& diags);
+    void DirCfiAdjustCfaOffset(DirectiveInfo& info, DiagnosticsEngine& diags);
+    void DirCfiOffset(DirectiveInfo& info, DiagnosticsEngine& diags);
+    void DirCfiRelOffset(DirectiveInfo& info, DiagnosticsEngine& diags);
+    void DirCfiRegister(DirectiveInfo& info, DiagnosticsEngine& diags);
+    void DirCfiRestore(DirectiveInfo& info, DiagnosticsEngine& diags);
+    void DirCfiUndefined(DirectiveInfo& info, DiagnosticsEngine& diags);
+    void DirCfiSameValue(DirectiveInfo& info, DiagnosticsEngine& diags);
+    void DirCfiRememberState(DirectiveInfo& info, DiagnosticsEngine& diags);
+    void DirCfiRestoreState(DirectiveInfo& info, DiagnosticsEngine& diags);
+    void DirCfiReturnColumn(DirectiveInfo& info, DiagnosticsEngine& diags);
+    void DirCfiSignalFrame(DirectiveInfo& info, DiagnosticsEngine& diags);
+    void DirCfiWindowSave(DirectiveInfo& info, DiagnosticsEngine& diags);
+    void DirCfiEscape(DirectiveInfo& info, DiagnosticsEngine& diags);
+    void DirCfiValEncodedAddr(DirectiveInfo& info, DiagnosticsEngine& diags);
 
     // CFI directive helpers
-    bool DirCheck(DirectiveInfo& info, Diagnostic& diags, unsigned int nargs);
+    bool DirCheck(DirectiveInfo& info,
+                  DiagnosticsEngine& diags,
+                  unsigned int nargs);
     void DirRegNum(NameValue& nv,
-                   Diagnostic& diags,
+                   DiagnosticsEngine& diags,
                    Object* obj,
                    unsigned int* out,
                    bool* out_set);
@@ -173,8 +177,8 @@ private:
 
     // Generate CFI section.
     void GenerateCfiSection(ObjectFormat& ofmt,
-                            Diagnostic& diags,
-                            llvm::StringRef sectname,
+                            DiagnosticsEngine& diags,
+                            StringRef sectname,
                             bool eh_frame);
 
     /// Generate .debug_line section.
@@ -239,9 +243,9 @@ private:
     /// @param tail     end of data
     void setHeadEnd(Location head, Location tail);
 
-    size_t AddFile(unsigned long filenum, llvm::StringRef pathname);
+    size_t AddFile(unsigned long filenum, StringRef pathname);
     size_t AddFile(const FileEntry* file);
-    unsigned long AddDir(llvm::StringRef dirname);
+    unsigned long AddDir(StringRef dirname);
 };
 
 class YASM_STD_EXPORT DwarfPassDebug : public DwarfDebug
@@ -252,11 +256,13 @@ public:
     {}
     ~DwarfPassDebug();
 
-    static llvm::StringRef getName() { return "DWARF passthrough only"; }
-    static llvm::StringRef getKeyword() { return "dwarfpass"; }
+    static StringRef getName() { return "DWARF passthrough only"; }
+    static StringRef getKeyword() { return "dwarfpass"; }
     static bool isOkObject(Object& object) { return true; }
 
-    void Generate(ObjectFormat& objfmt, SourceManager& smgr, Diagnostic& diags);
+    void Generate(ObjectFormat& objfmt,
+                  SourceManager& smgr,
+                  DiagnosticsEngine& diags);
 };
 
 class YASM_STD_EXPORT CfiDebug : public DwarfDebug
@@ -267,12 +273,14 @@ public:
     {}
     ~CfiDebug();
 
-    static llvm::StringRef getName() { return "CFI information only"; }
-    static llvm::StringRef getKeyword() { return "cfi"; }
+    static StringRef getName() { return "CFI information only"; }
+    static StringRef getKeyword() { return "cfi"; }
     static bool isOkObject(Object& object) { return true; }
 
-    void AddDirectives(Directives& dirs, llvm::StringRef parser);
-    void Generate(ObjectFormat& objfmt, SourceManager& smgr, Diagnostic& diags);
+    void AddDirectives(Directives& dirs, StringRef parser);
+    void Generate(ObjectFormat& objfmt,
+                  SourceManager& smgr,
+                  DiagnosticsEngine& diags);
 };
 
 

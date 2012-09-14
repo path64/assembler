@@ -24,9 +24,9 @@
 // ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
 //
+#include "Elf_x86_amd64.h"
 #include "ElfConfig.h"
 #include "ElfMachine.h"
-#include "ElfReloc.h"
 #include "ElfTypes.h"
 
 
@@ -34,38 +34,18 @@ using namespace yasm;
 using namespace yasm::objfmt;
 
 namespace {
-class ElfReloc_x86_amd64 : public ElfReloc
-{
-public:
-    ElfReloc_x86_amd64(const ElfConfig& config,
-                       const ElfSymtab& symtab,
-                       const llvm::MemoryBuffer& in,
-                       unsigned long* pos,
-                       bool rela)
-        : ElfReloc(config, symtab, in, pos, rela)
-    {}
-    ElfReloc_x86_amd64(SymbolRef sym, const IntNum& addr)
-        : ElfReloc(sym, addr)
-    {}
-
-    ~ElfReloc_x86_amd64() {}
-
-    bool setRel(bool rel, SymbolRef GOT_sym, size_t valsize, bool sign);
-    std::string getTypeName() const;
-};
-
 class Elf_x86_amd64 : public ElfMachine
 {
 public:
     ~Elf_x86_amd64() {}
 
     void Configure(ElfConfig* config) const;
-    void AddSpecialSymbols(Object& object, llvm::StringRef parser) const;
+    void AddSpecialSymbols(Object& object, StringRef parser) const;
 
     std::auto_ptr<ElfReloc>
     ReadReloc(const ElfConfig& config,
               const ElfSymtab& symtab,
-              const llvm::MemoryBuffer& in,
+              const MemoryBuffer& in,
               unsigned long* pos,
               bool rela) const
     {
@@ -82,8 +62,8 @@ public:
 } // anonymous namespace
 
 bool
-impl::ElfMatch_x86_amd64(llvm::StringRef arch_keyword,
-                         llvm::StringRef arch_machine,
+impl::ElfMatch_x86_amd64(StringRef arch_keyword,
+                         StringRef arch_machine,
                          ElfClass cls)
 {
     return (arch_keyword.equals_lower("x86") &&
@@ -109,8 +89,7 @@ Elf_x86_amd64::Configure(ElfConfig* config) const
 }
 
 void
-Elf_x86_amd64::AddSpecialSymbols(Object& object,
-                                 llvm::StringRef parser) const
+Elf_x86_amd64::AddSpecialSymbols(Object& object, StringRef parser) const
 {
     static const ElfSpecialSymbolData ssyms[] =
     {
@@ -218,6 +197,8 @@ ElfReloc_x86_amd64::getTypeName() const
         case R_X86_64_GOTPC32_TLSDESC: name = "R_X86_64_GOTPC32_TLSDESC"; break;
         case R_X86_64_TLSDESC_CALL: name = "R_X86_64_TLSDESC_CALL"; break;
         case R_X86_64_TLSDESC: name = "R_X86_64_TLSDESC"; break;
+        case R_X86_64_IRELATIVE: name = "R_X86_64_IRELATIVE"; break;
+        case R_X86_64_RELATIVE64: name = "R_X86_64_RELATIVE64"; break;
     }
 
     return name;

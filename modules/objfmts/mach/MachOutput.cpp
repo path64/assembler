@@ -133,9 +133,9 @@ namespace {
 class MachOutput : public BytecodeStreamOutput
 {
 public:
-    MachOutput(llvm::raw_ostream& os,
+    MachOutput(raw_ostream& os,
                Object& object,
-               Diagnostic& diags,
+               DiagnosticsEngine& diags,
                SymbolRef gotpcrel_sym,
                bool is64,
                bool all_syms);
@@ -211,9 +211,9 @@ isSectionLabel(const Symbol& sym)
     return true;
 }
 
-MachOutput::MachOutput(llvm::raw_ostream& os,
+MachOutput::MachOutput(raw_ostream& os,
                        Object& object,
-                       Diagnostic& diags,
+                       DiagnosticsEngine& diags,
                        SymbolRef gotpcrel_sym,
                        bool is64,
                        bool all_syms)
@@ -785,10 +785,10 @@ MachIsNotZeroFill(const Section& sect)
 }
 
 void
-MachObject::Output(llvm::raw_fd_ostream& os,
+MachObject::Output(raw_fd_ostream& os,
                    bool all_syms,
                    DebugFormat& dbgfmt,
-                   Diagnostic& diags)
+                   DiagnosticsEngine& diags)
 {
     const char pad_data[3] = {0, 0, 0};
 

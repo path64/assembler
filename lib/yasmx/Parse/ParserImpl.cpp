@@ -42,9 +42,8 @@ ParseExprTerm::~ParseExprTerm()
 {
 }
 
-ParserImpl::ParserImpl(const ParserModule& module, Preprocessor& preproc)
-    : Parser(module)
-    , m_preproc(preproc)
+ParserImpl::ParserImpl(Preprocessor& preproc)
+    : m_preproc(preproc)
     , m_paren_count(0)
     , m_bracket_count(0)
 {
@@ -53,12 +52,6 @@ ParserImpl::ParserImpl(const ParserModule& module, Preprocessor& preproc)
 
 ParserImpl::~ParserImpl()
 {
-}
-
-Preprocessor&
-ParserImpl::getPreprocessor() const
-{
-    return m_preproc;
 }
 
 SourceLocation
@@ -203,12 +196,12 @@ ParserImpl::SkipUntil(const unsigned int* toks,
     }
 }
 
-llvm::StringRef
+StringRef
 ParserImpl::MergeTokensUntil(const unsigned int* toks,
                              unsigned int num_toks,
                              SourceLocation* start,
                              SourceLocation* end,
-                             llvm::SmallVectorImpl<char>& buffer,
+                             SmallVectorImpl<char>& buffer,
                              bool stop_at_eos,
                              bool stop_at_ws)
 {
@@ -229,7 +222,7 @@ ParserImpl::MergeTokensUntil(const unsigned int* toks,
 
         // Turn the token back into characters.
         // The first if's are optimizations for common cases.
-        llvm::StringRef data;
+        StringRef data;
         if (m_token.isLiteral())
         {
             data = m_token.getLiteral();
@@ -243,9 +236,8 @@ ParserImpl::MergeTokensUntil(const unsigned int* toks,
         {
             // Get the raw data from the source manager.
             SourceManager& smgr = m_preproc.getSourceManager();
-            data =
-                llvm::StringRef(smgr.getCharacterData(m_token.getLocation()),
-                                m_token.getLength());
+            data = StringRef(smgr.getCharacterData(m_token.getLocation()),
+                             m_token.getLength());
         }
         buffer.append(data.begin(), data.end());
         *end = m_token.getEndLocation();
@@ -257,5 +249,5 @@ ParserImpl::MergeTokensUntil(const unsigned int* toks,
             break;
     }
 done:
-    return llvm::StringRef(buffer.data(), buffer.size());
+    return StringRef(buffer.data(), buffer.size());
 }

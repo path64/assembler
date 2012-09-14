@@ -42,12 +42,10 @@
 #include "ElfTypes.h"
 
 
-namespace llvm { class MemoryBuffer; }
-
 namespace yasm
 {
 
-class Diagnostic;
+class DiagnosticsEngine;
 class Expr;
 class Object;
 class Section;
@@ -63,11 +61,11 @@ public:
 
     // Constructor that reads from memory buffer (e.g. from file)
     ElfSymbol(const ElfConfig&          config,
-              const llvm::MemoryBuffer& in,
+              const MemoryBuffer& in,
               const ElfSection&         symtab_sect,
               ElfSymbolIndex            index,
               Section*                  sections[],
-              Diagnostic&               diags);
+              DiagnosticsEngine&        diags);
 
     ElfSymbol();
     ~ElfSymbol();
@@ -78,8 +76,8 @@ public:
     pugi::xml_node Write(pugi::xml_node out) const;
 #endif // WITH_XML
 
-    void Finalize(Symbol& sym, Diagnostic& diags);
-    void Write(Bytes& bytes, const ElfConfig& config, Diagnostic& diags);
+    void Finalize(Symbol& sym, DiagnosticsEngine& diags);
+    void Write(Bytes& bytes, const ElfConfig& config, DiagnosticsEngine& diags);
 
     void setSection(Section* sect) { m_sect = sect; }
     void setName(ElfStringIndex index) { m_name_index = index; }

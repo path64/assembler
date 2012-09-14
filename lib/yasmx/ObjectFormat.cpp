@@ -36,19 +36,19 @@ ObjectFormat::~ObjectFormat()
 }
 
 void
-ObjectFormat::AddDirectives(Directives& dirs, llvm::StringRef parser)
+ObjectFormat::AddDirectives(Directives& dirs, StringRef parser)
 {
 }
 
 bool
-ObjectFormat::Read(SourceManager& sm, Diagnostic& diags)
+ObjectFormat::Read(SourceManager& sm, DiagnosticsEngine& diags)
 {
     diags.Report(SourceLocation(), diag::err_object_read_not_supported);
     return false;
 }
 
 void
-ObjectFormat::InitSymbols(llvm::StringRef parser)
+ObjectFormat::InitSymbols(StringRef parser)
 {
 }
 
@@ -56,7 +56,7 @@ ObjectFormatModule::~ObjectFormatModule()
 {
 }
 
-llvm::StringRef
+StringRef
 ObjectFormatModule::getType() const
 {
     return "ObjectFormat";
