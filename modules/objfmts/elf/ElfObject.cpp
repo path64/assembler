@@ -871,14 +871,20 @@ ElfOutput::ConvertValueToBytes(Value& value,
             //
             // This is only done if the symbol is relocated against the
             // section instead of the symbol itself.
+            // Also, if the symbol's section has the merge flag set, we can't
+            // relocate against the section.
             Location symloc;
             if (sym->getLabel(&symloc))
             {
-                // Relocate to section start
                 Section* sym_sect = symloc.bc->getContainer()->getSection();
-                sym = sym_sect->getSymbol();
+                ElfSection* elfsect = sym_sect->getAssocData<ElfSection>();
+                if ((elfsect->getFlags() & SHF_MERGE) == 0)
+                {
+                    // Relocate to section start
+                    sym = sym_sect->getSymbol();
 
-                intn += symloc.getOffset();
+                    intn += symloc.getOffset();
+                }
             }
         }
 
@@ -1607,7 +1613,13 @@ ElfObject::DirGasSection(DirectiveInfo& info, DiagnosticsEngine& diags)
             return;
         }
         ++nv;
-        if (nv == nvs.end() || !nv->isId())
+        if (nv == nvs.end())
+        {
+            diags.Report((nv-1)->getValueRange().getEnd(),
+                         diag::err_expected_ident);
+            return;
+        }
+        if (!nv->isId())
         {
             diags.Report(nv->getValueRange().getBegin(),
                          diag::err_expected_ident);
@@ -1639,21 +1651,23 @@ ElfObject::DirGasSection(DirectiveInfo& info, DiagnosticsEngine& diags)
     // Handle merge entity size
     if ((flags & SHF_MERGE) != 0)
     {
-        if (nv == nvs.end())
+        if (nv != nvs.end())
         {
-            diags.Report(nv->getValueRange().getBegin(),
-                         diag::err_expected_merge_entity_size);
-            return;
+            IntNum merge;
+            bool merge_ok;
+            DirIntNum(*nv, diags, &m_object, &merge, &merge_ok);
+            if (!merge_ok)
+                return;
+
+            elfsect->setEntSize(merge.getUInt());
+            ++nv;
         }
-
-        IntNum merge;
-        bool merge_ok;
-        DirIntNum(*nv, diags, &m_object, &merge, &merge_ok);
-        if (!merge_ok)
-            return;
-
-        elfsect->setEntSize(merge.getUInt());
-        ++nv;
+        else
+        {
+            diags.Report((nv-1)->getValueRange().getEnd(),
+                         diag::warn_expected_merge_entity_size);
+            flags &= ~SHF_MERGE;
+        }
     }
 
     // Handle group name
@@ -1661,7 +1675,7 @@ ElfObject::DirGasSection(DirectiveInfo& info, DiagnosticsEngine& diags)
     {
         if (nv == nvs.end())
         {
-            diags.Report(nv->getValueRange().getBegin(),
+            diags.Report((nv-1)->getValueRange().getEnd(),
                          diag::err_expected_group_name);
             return;
         }
@@ -1828,7 +1842,12 @@ ElfObject::DirType(DirectiveInfo& info, DiagnosticsEngine& diags)
         ++nv;
 
     // Pull new type from param
-    if (nv == end || !nv->isId())
+    if (nv == end)
+    {
+        diags.Report((nv-1)->getValueRange().getEnd(), diag::err_expected_ident);
+        return;
+    }
+    if (!nv->isId())
     {
         diags.Report(nv->getValueRange().getBegin(), diag::err_expected_ident);
         return;
@@ -1885,6 +1904,11 @@ ElfObject::DirWeak(DirectiveInfo& info, DiagnosticsEngine& diags)
     for (NameValues::iterator nv = namevals.begin(), end = namevals.end();
          nv != end; ++nv)
     {
+        if (!nv->isId())
+        {
+            diags.Report(nv->getValueRange().getBegin(), diag::err_value_id);
+            continue;
+        }
         SymbolRef sym = info.getObject().getSymbol(nv->getId());
         sym->CheckedDeclare(Symbol::GLOBAL, nv->getValueRange().getBegin(),
                             diags);
